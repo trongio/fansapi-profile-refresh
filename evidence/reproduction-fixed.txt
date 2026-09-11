@@ -1,0 +1,17 @@
+$ dc php artisan fans:demo fixed --wait=120
+started: 2026-09-11T16:40:54Z
+----------------------------------------------------------------
+
+Mode: fixed  (expectation: a response we cannot validate must preserve the last valid snapshot)
++-------------------+--------------+-----------------+---------------------+------------------+--------------------+---------+
+| case              | stored likes | stored revision | last success        | last failure     | expected likes/rev | verdict |
++-------------------+--------------+-----------------+---------------------+------------------+--------------------+---------+
+| case-new-format   | 121000       | 11              | 2026-09-11 16:40:57 | -                | 121000 / 11        | OK      |
+| case-old-format   | 120000       | 10              | 2026-09-11 16:40:57 | -                | 120000 / 10        | OK      |
+| case-server-error | 120000       | 9               | -                   | budget_exhausted | 120000 / 9         | OK      |
+| case-throttled    | 120000       | 9               | -                   | budget_exhausted | 120000 / 9         | OK      |
++-------------------+--------------+-----------------+---------------------+------------------+--------------------+---------+
+All four cases preserved or advanced data correctly.
+----------------------------------------------------------------
+exit status: 0
+elapsed: 88s

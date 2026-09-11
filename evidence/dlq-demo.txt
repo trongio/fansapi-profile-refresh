@@ -1,0 +1,35 @@
+$ dc php artisan fans:demo dlq-demo --wait=180
+started: 2026-09-11T16:43:31Z
+----------------------------------------------------------------
+1. upstream is permanently throttled for a-01
++-------------------+---------------------------------------------------------------------------------+
+| field             | value                                                                           |
++-------------------+---------------------------------------------------------------------------------+
+| run               | 1                                                                               |
+| status            | dead_lettered                                                                   |
+| reason            | upstream request budget exhausted after 5 attempts; last category was throttled |
+| upstream requests | 5                                                                               |
+| queue deliveries  | 10                                                                              |
+| failed_jobs uuid  | d523f69a-ca12-482e-bd90-3b29fdeb6646                                            |
+| preserved likes   | 120000                                                                          |
+| last success      | never                                                                           |
++-------------------+---------------------------------------------------------------------------------+
+2. fixture repaired: a-01 now serves the new nested format at revision 11
+3. replaying through the ordinary dispatch path
+   concurrent replay request returned: a replay is already pending
++--------------------------+------------------------------------------+
+| field                    | value                                    |
++--------------------------+------------------------------------------+
+| replay run               | 2                                        |
+| replay status            | succeeded                                |
+| stored likes             | 121000                                   |
+| stored revision          | 11                                       |
+| last success             | 2026-09-11 16:44:22                      |
+| original run status      | dead_lettered (kept for the audit trail) |
+| original resolved at     | 2026-09-11 16:44:22                      |
+| duplicate active replays | 1                                        |
++--------------------------+------------------------------------------+
+Dead letter replayed and resolved; data is valid.
+----------------------------------------------------------------
+exit status: 0
+elapsed: 51s

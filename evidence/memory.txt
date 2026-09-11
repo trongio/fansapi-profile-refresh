@@ -1,0 +1,26 @@
+$ dc php artisan fans:memory --jobs=100 --wait=240 --json=evidence/memory.json
+started: 2026-09-11T16:44:23Z
+----------------------------------------------------------------
+queued 100 fixture refreshes on refresh-a
+
++------------+------+-------------------+----------------+-------------+
+| worker pid | jobs | PHP current (MiB) | PHP peak (MiB) | RSS (MiB)   |
++------------+------+-------------------+----------------+-------------+
+| 68         | 120  | 12.0 - 12.0       | 18.0           | 73.1 - 73.1 |
++------------+------+-------------------+----------------+-------------+
++----------------------------------+---------------------------------------------+
+| measure                          | value                                       |
++----------------------------------+---------------------------------------------+
+| jobs measured (after warm-up)    | 120                                         |
+| distinct worker PIDs (restarts)  | 1                                           |
+| first quarter mean RSS           | 73.1 MiB                                    |
+| last quarter mean RSS            | 73.1 MiB                                    |
+| drift                            | +0.00 MiB                                   |
+| php memory_limit                 | 128M (this CLI; workers use the same image) |
+| horizon worker recycle threshold | 96 MiB                                      |
+| failed refreshes in this run     | 5                                           |
++----------------------------------+---------------------------------------------+
+wrote evidence/memory.json
+----------------------------------------------------------------
+exit status: 0
+elapsed: 71s

@@ -1,0 +1,17 @@
+{
+    "jobs_requested": 100,
+    "samples_measured": 120,
+    "warmup_skipped": 10,
+    "workers": [
+        {
+            "pid": 68,
+            "jobs": 120,
+            "php_peak_bytes": 18874368,
+            "rss_max_bytes": 76673024
+        }
+    ],
+    "rss_first_quarter_mean_bytes": 76673024,
+    "rss_last_quarter_mean_bytes": 76673024,
+    "php_memory_limit": "128M",
+    "horizon_worker_recycle_mib": 96
+}
