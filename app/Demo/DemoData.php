@@ -44,8 +44,14 @@ class DemoData
             'key' => 'B', 'label' => 'Account B (healthy)', 'queue' => 'refresh-b',
             'source' => 'fixture', 'workspace' => 'demo',
         ]);
+        // Two live access contexts for the same real profile. Direct is the
+        // default live route; the managed provider is the optional fallback.
         $live = Account::create([
-            'key' => 'LIVE', 'label' => 'Managed provider (live)', 'queue' => 'refresh-a',
+            'key' => 'LIVE', 'label' => 'OnlyFans direct (live, default)', 'queue' => 'refresh-a',
+            'source' => 'onlyfans', 'workspace' => config('fansapi.onlyfans.workspace'),
+        ]);
+        $provider = Account::create([
+            'key' => 'PROVIDER', 'label' => 'Managed provider (live, fallback)', 'queue' => 'refresh-a',
             'source' => 'ofapi', 'workspace' => config('fansapi.ofapi.workspace'),
         ]);
 
@@ -61,6 +67,7 @@ class DemoData
 
         // The real target, only ever refreshed by the explicit live action.
         $this->makeProfile($live, 'madison420ivy');
+        $this->makeProfile($provider, 'madison420ivy');
     }
 
     private function makeProfile(Account $account, string $username): Profile

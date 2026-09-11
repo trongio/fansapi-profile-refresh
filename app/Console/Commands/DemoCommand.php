@@ -32,6 +32,7 @@ class DemoCommand extends Command
         {action : seed|state|broken|fixed|workload|dlq|dlq-demo|replay|live}
         {--mode=fixed : workload mode (broken|fixed)}
         {--run= : refresh run id for replay}
+        {--source= : live source for `live`: onlyfans (default) or ofapi}
         {--wait=90 : seconds to wait for background workers}
         {--page=1 : page for dlq}
         {--json= : write the machine-readable result to this path}';
@@ -323,18 +324,21 @@ class DemoCommand extends Command
     /** Deliberately separate: no other action ever touches the live provider. */
     private function live(): int
     {
-        $profile = Profile::whereHas('account', fn ($q) => $q->where('source', 'ofapi'))->first();
+        $source = $this->option('source') ?: config('fansapi.live_source');
+
+        $profile = Profile::whereHas('account', fn ($q) => $q->where('source', $source))->first();
         if ($profile === null) {
-            $this->error('No live profile seeded. Run: php artisan fans:demo seed');
+            $this->error("No live profile seeded for source '{$source}'. Run: php artisan fans:demo seed");
 
             return self::FAILURE;
         }
 
-        if (blank(config('fansapi.ofapi.token'))) {
+        if ($source === 'ofapi' && blank(config('fansapi.ofapi.token'))) {
             $this->error('OFAPI_TOKEN is not set in .env');
 
             return self::FAILURE;
         }
+        $this->line("Live source: {$source}");
 
         $profile->forceFill(['pending_run_id' => null, 'terminal_failed_at' => null])->save();
         $run = $this->dispatcher->enqueue($profile, 'cli');
@@ -359,7 +363,8 @@ class DemoCommand extends Command
             ['favoritesCount (outgoing, retained)', data_get($profile->snapshot, 'favoritesCount', '-')],
             ['subscriber count', 'not exposed by this endpoint (null)'],
             ['upstream revision', 'not exposed by this endpoint (null)'],
-            ['served from provider cache', $profile->snapshot_from_cache ? 'yes' : 'no'],
+            ['served from provider cache', $source === 'ofapi' ? ($profile->snapshot_from_cache ? 'yes' : 'no') : 'n/a (direct)'],
+            ['failure (if any)', $run->outcome_message ?? '-'],
             ['last success (UTC)', $profile->last_success_at?->toDateTimeString() ?? '-'],
             ['next refresh (UTC)', $profile->next_refresh_at?->toDateTimeString() ?? '-'],
         ]);

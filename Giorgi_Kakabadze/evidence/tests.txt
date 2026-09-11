@@ -1,0 +1,91 @@
+$ dc ./vendor/bin/phpunit --testdox
+started: 2026-09-11T17:17:12Z
+----------------------------------------------------------------
+PHPUnit 12.5.35 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.25
+Configuration: /var/www/html/phpunit.xml
+
+...........................................................       59 / 59 (100%)
+
+Time: 00:06.042, Memory: 22.00 MB
+
+[4mConcurrent Commit (Tests\Feature\ConcurrentCommit)[0m
+[32m ✔ [0mA concurrent older revision cannot overwrite a newer committed one
+
+[4mCount Value (Tests\Unit\CountValue)[0m
+[32m ✔ [0mExplicit zero is valid information
+[32m ✔ [0mCanonical integers and integer strings are accepted
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36mnegative[2m·[22mint[0m
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36mnegative[2m·[22mstring[0m
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36mfractional[0m
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36mfloat[2m·[22mwhole[0m
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36mboolean[2m·[22mtrue[0m
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36mboolean[2m·[22mfalse[0m
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36mnull[0m
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36marray[0m
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36mempty[2m·[22mstring[0m
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36mnon[2m·[22mnumeric[2m·[22mstring[0m
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36mleading[2m·[22mplus[0m
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36mleading[2m·[22mzero[0m
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36mwhitespace[0m
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36mexponent[0m
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36mdecimal[2m·[22mstring[0m
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36mhex[0m
+[32m ✔ [0mInvalid counts are rejected[2m with [22m[36moverflow[2m·[22mstring[0m
+
+[4mData Protection (Tests\Feature\DataProtection)[0m
+[32m ✔ [0mProfile identity is unique in sql
+[32m ✔ [0mThe same username can exist on a different account
+[32m ✔ [0mA late older revision cannot overwrite a newer one
+[32m ✔ [0mReplaying a committed run changes nothing
+[32m ✔ [0mAn equal revision with identical content is recorded as verified unchanged
+[32m ✔ [0mAn equal revision with different content is rejected
+[32m ✔ [0mA late run cannot clear a newer runs pending pointer
+[32m ✔ [0mThe refresh interval switches at exactly one hundred thousand
+
+[4mDead Letter Replay (Tests\Feature\DeadLetterReplay)[0m
+[32m ✔ [0mThe http budget bounds the real upstream requests
+[32m ✔ [0mAn exhausted run becomes a dead letter with the data preserved
+[32m ✔ [0mA repeated replay request does not create duplicate active work
+[32m ✔ [0mA replay against a repaired upstream commits and resolves the original
+
+[4mFailure Preserves Data (Tests\Feature\FailurePreservesData)[0m
+[32m ✔ [0mA 429 without retry after releases the job and keeps the data
+[32m ✔ [0mA valid retry after header is respected exactly
+[32m ✔ [0mAn empty 500 is retried and keeps the data
+[32m ✔ [0mA malformed body is a schema failure and terminal
+[32m ✔ [0mLikes missing from a valid 200 is a schema failure not a zero
+[32m ✔ [0mA 404 is a terminal missing profile and a 403 is not
+[32m ✔ [0mA body above the cap is rejected while it is still arriving
+
+[4mInterface (Tests\Feature\Interface)[0m
+[32m ✔ [0mThe refresh action only enqueues and never calls the upstream
+[32m ✔ [0mA second click is deduplicated in the backend
+[32m ✔ [0mChanges require a post and carry a csrf token
+[32m ✔ [0mThe profile list shows the last valid values and the source mode
+[32m ✔ [0mThe activity endpoint returns per account rows
+[32m ✔ [0mScout searches profiles through the database engine
+
+[4mResponse Format (Tests\Feature\ResponseFormat)[0m
+[32m ✔ [0mThe old top level format is accepted
+[32m ✔ [0mThe new nested format is accepted
+[32m ✔ [0mExplicit zero likes is valid but missing likes is not
+[32m ✔ [0mDisagreeing locations are rejected
+[32m ✔ [0mA missing revision is rejected for fixture payloads
+[32m ✔ [0mA mismatched identity is rejected
+[32m ✔ [0mThe provider envelope maps favorited count to likes
+
+[4mScheduling (Tests\Feature\Scheduling)[0m
+[32m ✔ [0mOnly due profiles are selected and the batch is bounded
+[32m ✔ [0mRepeated scheduling does not create work that is already pending
+[32m ✔ [0mAn unresolved terminal failure is not rescheduled every minute
+[32m ✔ [0mAn abandoned claim is recovered under the same logical run id
+[32m ✔ [0mReconciliation leaves delayed and recently touched work alone
+[32m ✔ [0mA run past its deadline is failed rather than retried forever
+[32m ✔ [0mA successful refresh schedules the next one by the likes threshold
+
+[30;42mOK (59 tests, 200 assertions)[0m
+----------------------------------------------------------------
+exit status: 0
+elapsed: 6s

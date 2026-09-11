@@ -30,6 +30,7 @@ Thumbs.db
 /storage/fixture
 /storage/logs/memory-samples.jsonl
 
-# Submission archive
+# Submission archive and any extracted copy of it
 /*.zip
+/Giorgi_Kakabadze/
 /.playwright-mcp

@@ -10,8 +10,22 @@
 
 return [
 
-    // "ofapi" = live managed provider, "fixture" = private local upstream.
+    // Default source for new demo data: "fixture" (private local upstream).
+    // Live accounts carry their own source: "onlyfans" (direct, the default
+    // live route) or "ofapi" (managed provider, the optional fallback).
     'source' => env('PROFILE_SOURCE', 'fixture'),
+    'live_source' => env('LIVE_SOURCE', 'onlyfans'),
+
+    // Direct, anonymous OnlyFans access: signed the way the web client signs,
+    // with community-published rotating rules. No account, no browser.
+    'onlyfans' => [
+        'base_url' => rtrim((string) env('ONLYFANS_BASE_URL', 'https://onlyfans.com'), '/'),
+        'rules_url' => env('ONLYFANS_RULES_URL', 'https://raw.githubusercontent.com/datawhores/onlyfans-dynamic-rules/main/dynamicRules.json'),
+        'rules_ttl_seconds' => (int) env('ONLYFANS_RULES_TTL', 3600),
+        'user_agent' => env('ONLYFANS_USER_AGENT', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36'),
+        'workspace' => 'onlyfans-direct',
+        'requests_per_minute' => (int) env('ONLYFANS_REQUESTS_PER_MINUTE', 30),
+    ],
 
     'ofapi' => [
         'base_url' => rtrim((string) env('OFAPI_BASE_URL', 'https://app.onlyfansapi.com/api'), '/'),

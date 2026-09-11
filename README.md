@@ -32,7 +32,7 @@ docker compose exec app php artisan fans:demo seed
 Everything else:
 
 ```bash
-docker compose exec app ./vendor/bin/phpunit          # 59 tests
+docker compose exec app ./vendor/bin/phpunit          # 62 tests
 docker compose exec app php artisan fans:demo broken  # the incident, rerun (exits 1)
 docker compose exec app php artisan fans:demo fixed   # same inputs, fixed
 docker compose exec app php artisan fans:demo workload --mode=fixed
@@ -45,47 +45,63 @@ docker compose exec app php artisan fans:demo live    # the only live call
 `.env` is git-ignored and `.env.example` ships with a blank token. No
 credential is in this repository, in the evidence, or in the logs.
 
-## Live retrieval: it works
+## Live retrieval
+
+There are two live adapters behind one `ProfileClient` interface. The account
+chooses which: `onlyfans` (direct, the default) or `ofapi` (managed provider).
+
+### Direct OnlyFans, the default (`fans:demo live --source=onlyfans`)
+
+The web client signs every API call with a rotating scheme; there is no public
+API. The direct adapter reproduces that signing without a browser and without
+an account:
+
+- `OnlyfansSigner` computes the `sign` header, `sha1(static \n time \n path \n
+  user_id)` plus a checksum over selected digits, exactly as the web client
+  does. It is a pure function with a unit test pinning it.
+- `OnlyfansRules` fetches the rotating parameters from a community-maintained
+  source, caches them for an hour, and generates the `x-bc` device id once, the
+  way the browser stores its own in `localStorage`.
+
+As of this submission, a correctly signed **anonymous** request still returns:
+
+```
+HTTP 400  {"error":{"code":401,"message":"Please refresh the page"}}
+```
+
+OnlyFans now gates the public profile endpoint behind a session it hands out
+only on a real page load with a JS challenge, which is exactly the browser
+dependency the low-memory design avoids. The adapter treats this as a first
+class outcome (`signature_rejected`): the run is dead-lettered, **the last
+valid data is preserved**, and it is replayable once the rules or the session
+path are updated. It is not a crash and it never writes bad data.
+
+### Managed provider, the fallback (`fans:demo live --source=ofapi`)
+
+`app.onlyfansapi.com` performs the signing and session maintenance server-side
+and returns the profile. This is the route that returns data today:
 
 ```
 GET https://app.onlyfansapi.com/api/profiles/madison420ivy?fresh=true
-HTTP 200, 4,448 bytes
+HTTP 200
 ```
-
-Verified twice: once with plain `curl` before any code existed, and once end to
-end through a queued job and a real Horizon worker
-(`evidence/live-retrieval.json`).
 
 | Field | Value |
 | --- | --- |
 | Upstream id | 5140520 |
-| `favoritedCount` (stored as likes) | 605,782 |
+| `favoritedCount` (stored as likes) | 605,799 |
 | `favoritesCount` (retained, not used as likes) | 16 |
 | Subscriber count | not exposed by this endpoint, stays null |
 | Upstream revision | not exposed by this endpoint, stays null |
 | Served from provider cache | no (`fresh=true`) |
 
-**This uses a managed provider**, `app.onlyfansapi.com`. It owns request
-signing and session maintenance; none of that is implemented here.
+Both adapters map to the same `NormalizedProfile`; the direct one returns the
+profile object unwrapped, the provider wraps it in `data`. Nothing downstream,
+validation, revision safety, queues, isolation, memory, depends on which route
+produced the JSON. That is the point of the interface: when the direct session
+step is solved, it becomes the working default with no other change.
 
-The reviewer's follow-up said to treat OnlyFans as the upstream HTTP source,
-that no OnlyFans account is needed, and that fixtures for the failure modes
-plus a live happy-path check are fine. So the direct route was probed as well,
-anonymously, from this machine:
-
-| Route | Result |
-| --- | --- |
-| `GET https://onlyfans.com/api2/v2/users/madison420ivy` | HTTP 400, `{"error":{"code":0,"message":"Something went wrong."}}` |
-| `GET https://onlyfans.com/madison420ivy` | HTTP 200, a 17 KB JavaScript app shell with no profile fields in it |
-
-Direct JSON access needs the signed `app-token` / `sign` / `time` headers that
-the scraper projects reverse-engineer from OnlyFans' dynamic rules, and the
-HTML page renders client-side. Neither gives anonymous profile data, which is
-why the managed provider is the live adapter. A direct adapter would slot in
-behind the same `ProfileClient` interface once signing exists; the rest of the
-pipeline is unchanged by where the JSON comes from.
-
-**`favoritedCount` versus `favoritesCount`.** The first is 605,782 and the
+**`favoritedCount` versus `favoritesCount`.** The first is ~605,800 and the
 second is 16 for this profile, which is only consistent with the first being
 likes received and the second being profiles this account favourited. Both are
 kept in the snapshot. This has not been confirmed with the provider.
@@ -399,7 +415,7 @@ before this session, which was not timed.
 | Live probe, scaffold, Docker image, Compose | 15 min | `curl` of the provider first, Laravel 13 skeleton, PHP 8.4 image, dependency resolution |
 | Core pipeline | 30 min | migrations, models, client, normalizer, writer, dispatcher, job, fixture server, demo commands |
 | Bring-up and first runs | 15 min | stack up, broken and fixed reproductions, both workload modes, two real defects fixed |
-| Tests | 20 min | 59 tests across seven files, including the two-process race |
+| Tests | 20 min | 62 tests across eight files, including the two-process race |
 | Dead letters, memory scenario, live run, evidence | 20 min | DLQ replay path, memory probe, `fans:demo live`, `capture-evidence.sh` |
 | Documentation and clean-setup check | 15 min | README, call guide, AI.md, requirements map, teardown and rebuild from empty volumes |
 | Review pass | 30 min | enum, factories, listeners, scheduled commands, Pint, Playwright run, direct-route probe, evidence regenerated |

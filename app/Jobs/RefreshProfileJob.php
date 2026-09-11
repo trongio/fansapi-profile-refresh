@@ -207,7 +207,7 @@ class RefreshProfileJob implements ShouldQueue
         // The managed provider bills one quota per WORKSPACE, shared by every
         // key, so a 429 from it must slow the whole workspace down. The fixture
         // models an account-specific outage, which must not stall account B.
-        if ($run->account->source === 'ofapi') {
+        if (in_array($run->account->source, ['ofapi', 'onlyfans'], true)) {
             $admission->coolDownWorkspace($run->account, (int) config('fansapi.cooldown.workspace_seconds'));
         }
 

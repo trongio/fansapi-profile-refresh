@@ -24,7 +24,7 @@ Every requested behaviour, and where to verify it.
 | Both fixture payloads plus 429 without `Retry-After` and empty 500 | `FixtureScenario::incidentCases()` |
 | Broken handler reads top-level likes only, defaults to zero, always succeeds | `app/Demo/BrokenProfileHandler.php`, `BrokenRefreshJob.php` |
 | Failing reproduction output saved, all four cases | `evidence/reproduction-broken.txt` (exit 1) |
-| Normal suite passes while the reproduction stays rerunnable | `evidence/tests.txt` (59 pass), `fans:demo broken` |
+| Normal suite passes while the reproduction stays rerunnable | `evidence/tests.txt` (62 pass), `fans:demo broken` |
 | Broken handler confined to the demo namespace | `app/Demo/`, guarded by `abort_unless(app()->environment(...))` |
 
 ## Data protection

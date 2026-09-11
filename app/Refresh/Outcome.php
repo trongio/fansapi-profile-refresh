@@ -43,6 +43,8 @@ final class Outcome
 
     public const UNEXPECTED_STATUS = 'unexpected_status';
 
+    public const SIGNATURE_REJECTED = 'signature_rejected';   // direct OnlyFans: signing rules stale
+
     public const RETRYABLE = [
         self::THROTTLED,
         self::SERVER_ERROR,

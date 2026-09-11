@@ -84,7 +84,12 @@ abstract class BoundedHttpClient
         }
 
         if ($status < 200 || $status >= 300) {
-            return new ClientResult(Outcome::UNEXPECTED_STATUS, $status, null, $elapsed());
+            // A short, sanitised excerpt so an adapter can tell "bad signature"
+            // from "bad request" without ever logging a full upstream body.
+            $excerpt = (string) (json_decode($raw, true)['error']['message'] ?? '');
+
+            return new ClientResult(Outcome::UNEXPECTED_STATUS, $status, null, $elapsed(),
+                message: $excerpt !== '' ? $this->summarise($excerpt) : null);
         }
 
         // Decode exactly once; no raw/array/object copies are kept afterwards.

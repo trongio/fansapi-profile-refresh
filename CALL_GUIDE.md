@@ -26,8 +26,10 @@ Jobs are tagged `run:<id>`, so a single refresh can be found under *Monitoring*.
 ## Opening, 60 to 90 seconds
 
 > This app keeps a stored copy of OnlyFans profile data. It pulls a profile
-> through a managed provider API, validates what comes back, and writes it to
-> MySQL. Refreshes run as Redis queue jobs under Horizon.
+> over HTTP, validates what comes back, and writes it to MySQL. Refreshes run
+> as Redis queue jobs under Horizon. There are two live adapters behind one
+> interface: a direct signed OnlyFans client, which is the default, and a
+> managed provider as the fallback.
 >
 > What broke was upstream, not us: the provider started returning the likes
 > count nested under a `profile` object instead of at the top level, and it
@@ -44,9 +46,14 @@ Jobs are tagged `run:<id>`, so a single refresh can be found under *Monitoring*.
 > re-checks the upstream revision under a row lock, so an old response arriving
 > late cannot overwrite a newer one.
 >
-> I verified the live provider call myself from this machine, and I did not
-> write any request signing: the provider handles that. Everything else is
-> measured locally against a fixture upstream in its own container.
+> On retrieval: I implemented the OnlyFans request signing myself, the way the
+> web client does it, no browser and no account. As of today a signed anonymous
+> request still gets a 400 asking to refresh the page, because OnlyFans issues
+> the session on a real page load with a JS challenge, which is the browser
+> dependency I was avoiding for memory. So the direct adapter reports that
+> cleanly and preserves the last good data, and the managed provider is the
+> fallback that returns data. Everything else is measured locally against a
+> fixture upstream in its own container.
 
 ## Five-minute demo
 

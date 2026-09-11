@@ -24,9 +24,13 @@ class ProfileNormalizer
      */
     public function normalize(array $body, Profile $profile, string $source): NormalizedProfile
     {
-        return $source === 'ofapi'
-            ? $this->normalizeProvider($body, $profile)
-            : $this->normalizeFixture($body, $profile);
+        return match ($source) {
+            'ofapi' => $this->normalizeProvider($body, $profile),
+            // Direct OnlyFans returns the profile object unwrapped; the fields
+            // (favoritedCount, favoritesCount, id, username) are identical.
+            'onlyfans' => $this->normalizeProvider(['data' => $body], $profile),
+            default => $this->normalizeFixture($body, $profile),
+        };
     }
 
     /** @param array<string,mixed> $body */

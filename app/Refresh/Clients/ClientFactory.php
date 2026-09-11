@@ -11,8 +11,14 @@ use App\Models\Account;
  */
 class ClientFactory
 {
+    public function __construct(private readonly OnlyfansRules $rules) {}
+
     public function for(Account $account): ProfileClient
     {
-        return $account->source === 'ofapi' ? new OfapiProfileClient : new FixtureProfileClient;
+        return match ($account->source) {
+            'onlyfans' => new OnlyfansDirectClient($this->rules),  // direct, the default live route
+            'ofapi' => new OfapiProfileClient,                     // managed provider, the fallback
+            default => new FixtureProfileClient,
+        };
     }
 }

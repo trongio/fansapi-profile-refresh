@@ -93,7 +93,7 @@ These were real defects found by running the thing, not hypotheticals:
 ## Review pass after the first submission
 
 A second pass checked the code against ordinary Laravel conventions and made
-these changes, all covered by the same 59 tests:
+these changes, all covered by the test suite (now 62 tests):
 
 - run status is a backed enum (`App\Enums\RunStatus`) cast on the model,
   instead of string constants;
@@ -111,13 +111,33 @@ was found. Upstream profile text (the `about` field, for instance) is stored in
 the JSON snapshot and is never rendered by any view; if it ever were, Blade's
 escaping applies.
 
+## Direct OnlyFans access, added after the follow-up
+
+The reviewer's follow-up framed OnlyFans itself as the upstream and said no
+account is needed. A direct adapter was added and made the default live source:
+`OnlyfansSigner` reproduces the web client's request signing (unit-tested
+against a fixed vector), `OnlyfansRules` fetches and caches the rotating
+parameters, and `OnlyfansDirectClient` sends a signed anonymous request with no
+browser and no account.
+
+What it actually returns, verified on this machine: `HTTP 400
+{"error":{"code":401,"message":"Please refresh the page"}}`. A signed request
+is not enough; OnlyFans gates the endpoint behind a session issued on a real
+page load with a JS challenge, which is the browser dependency the low-memory
+design deliberately avoids. The adapter surfaces this as `signature_rejected`,
+dead-letters the run and preserves the last valid data, rather than crashing or
+writing zero. The managed provider remains the fallback that returns data. This
+is disclosed rather than dressed up as working: the signing is real and tested,
+the anonymous session step is not solved, and the interface means solving it
+later changes nothing else.
+
 ## What remains unverified
 
 - **The provider's own reliability and quota behaviour.** One live call was
   made per verification, and a second during the demo. The workspace rate-limit
   path has not been exercised against a real 429 from the provider; it is
   modelled with the fixture.
-- **`favoritedCount` as "received likes".** It is 605,782 for this profile
+- **`favoritedCount` as "received likes".** It is ~605,800 for this profile
   while `favoritesCount` is 16, which is only consistent with one reading, and
   both fields are retained. It has not been confirmed with the provider.
 - **Crash semantics beyond the commit boundary.** The replay test proves
