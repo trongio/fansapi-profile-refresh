@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\RunStatus;
+use App\Models\Profile;
 use App\Models\RefreshRun;
 use App\Refresh\Admission;
 use App\Refresh\Clients\ClientFactory;
@@ -44,6 +45,9 @@ class RefreshProfileJob implements ShouldQueue
 
     public bool $failOnTimeout = true;
 
+    /** Everything the fetch and the normalizer need; deliberately no snapshot. */
+    private const PROFILE_COLUMNS = ['id', 'account_id', 'username', 'upstream_id', 'revision'];
+
     public function __construct(public readonly int $runId) {}
 
     /** Non-secret ids so a single request is findable in Horizon during the call. */
@@ -60,7 +64,12 @@ class RefreshProfileJob implements ShouldQueue
         Admission $admission,
         RefreshLogger $log,
     ): void {
-        $run = RefreshRun::query()->with(['account', 'profile'])->find($this->runId);
+        // The job never needs the stored snapshot; only the writer does, under
+        // its own lock. Leaving the JSON column out keeps the old snapshot from
+        // sitting in memory next to the incoming body.
+        $run = RefreshRun::query()
+            ->with(['account', 'profile' => fn ($q) => $q->select(self::PROFILE_COLUMNS)])
+            ->find($this->runId);
         if ($run === null) {
             return; // demo data was reset underneath us
         }
@@ -145,13 +154,15 @@ class RefreshProfileJob implements ShouldQueue
                     return;
                 }
 
+                $accepted = Profile::query()->whereKey($run->profile_id)->first(['likes', 'revision']);
+
                 $log->event($write->category, $run->refresh(), [
                     'job_id' => $this->job?->uuid(),
                     'http_status' => $result->status,
                     'duration_ms' => $result->durationMs,
                     'received_revision' => $normalized->revision,
-                    'accepted_revision' => $run->profile->fresh()->revision,
-                    'likes' => $run->profile->fresh()->likes,
+                    'accepted_revision' => $accepted?->revision,
+                    'likes' => $accepted?->likes,
                     'from_cache' => $normalized->fromCache,
                 ]);
 

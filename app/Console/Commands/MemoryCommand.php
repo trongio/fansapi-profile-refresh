@@ -24,6 +24,7 @@ class MemoryCommand extends Command
         {--jobs=100 : number of fixture refreshes}
         {--wait=180 : seconds to wait for the worker}
         {--warmup=10 : samples to ignore before comparing}
+        {--reuse : keep the existing scenario profiles, so stored snapshots from a previous pass are present}
         {--json= : write the machine-readable result here}';
 
     protected $description = 'Run a bounded fixture memory scenario through one persistent worker.';
@@ -37,32 +38,38 @@ class MemoryCommand extends Command
         }
 
         $count = (int) $this->option('jobs');
+        // Each pass serves a higher revision so a reused profile accepts the write.
+        $pass = $this->option('reuse') ? (int) RefreshRun::whereHas('account', fn ($q) => $q->where('key', 'MEM'))->max('accepted_revision') - 10 : 0;
+        $pass = max(0, $pass);
 
         $account = Account::firstOrCreate(
             ['key' => 'MEM'],
             ['label' => 'Memory scenario', 'queue' => 'refresh-a', 'source' => 'fixture', 'workspace' => 'demo'],
         );
 
-        Profile::where('account_id', $account->id)->delete();
+        if (! $this->option('reuse')) {
+            Profile::where('account_id', $account->id)->delete();
+        }
 
         $profiles = [];
         $specs = [];
         for ($i = 1; $i <= $count; $i++) {
             $username = sprintf('mem-%03d', $i);
-            $profiles[] = Profile::create([
-                'account_id' => $account->id,
-                'username' => $username,
-                'display_name' => $username,
-                'likes' => 120000,
-                'revision' => 9,
-            ]);
+            // With --reuse the row already carries whatever snapshot the last
+            // pass stored, which is the realistic steady state for a worker.
+            $profile = Profile::firstOrCreate(
+                ['account_id' => $account->id, 'username' => $username],
+                ['display_name' => $username, 'likes' => 120000, 'revision' => 9],
+            );
+            $profile->forceFill(['pending_run_id' => null, 'terminal_failed_at' => null])->save();
+            $profiles[] = $profile;
 
             $specs[$username] = match (true) {
                 // ~5% failures
                 $i % 20 === 0 => ['status' => 500, 'body' => '', 'delay_ms' => 0],
                 // ~15% near the 1 MiB cap but still valid
-                $i % 7 === 0 => ['format' => 'nested', 'likes' => 121000, 'revision' => 11, 'padding_bytes' => 900_000, 'delay_ms' => 0],
-                default => ['format' => 'nested', 'likes' => 121000, 'revision' => 11, 'delay_ms' => 0],
+                $i % 7 === 0 => ['format' => 'nested', 'likes' => 121000, 'revision' => 11 + $pass, 'padding_bytes' => 900_000, 'delay_ms' => 0],
+                default => ['format' => 'nested', 'likes' => 121000, 'revision' => 11 + $pass, 'delay_ms' => 0],
             };
         }
 

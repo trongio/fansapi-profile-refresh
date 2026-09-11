@@ -265,18 +265,28 @@ most 100, list pages show 25 rows, and no profile media is ever downloaded.
 There is exactly one size limit and it is enforced on the wire.
 
 100 fixture refreshes through one persistent worker after warm-up, mixing
-normal responses, ~900 KB near-limit responses and failures
+normal responses, ~900 KB near-limit responses and failures. The recorded
+run is a **second pass** (`fans:memory --reuse`): every profile already holds
+the snapshot from the first pass, 14 of them around 880 KB, so the worker is
+handling large stored data as well as large incoming bodies
 (`evidence/memory.txt`):
 
 | Measure | Value |
 | --- | --- |
 | Worker PIDs (restarts) | 1 |
-| Jobs measured after warm-up | 120 |
+| Jobs measured after warm-up | 119 |
+| Stored snapshot size, mean / max | 130 KB / 879 KB |
 | PHP peak allocation | 18 MiB |
-| Worker RSS | 73.1 MiB |
-| RSS drift, first quarter to last | +0.00 MiB |
+| Worker RSS | 72.3 to 72.7 MiB |
+| RSS drift, first quarter to last | within 0.1 MiB |
 | PHP `memory_limit` | 128M |
 | Horizon worker recycle threshold | 96 MiB |
+
+The job loads the profile without its snapshot column; only the writer reads
+it, under its own lock. An A/B run of the same second pass with and without
+that change measured the same 18 MiB peak and the same RSS, so the change is
+kept for correctness of intent, not for a number it can show at this scale
+(`memory_get_peak_usage(true)` reports in 2 MiB pages).
 
 The point is the plateau, not the cap: RSS is flat across the run, so memory is
 not growing with job count. Sampling happens inside the worker

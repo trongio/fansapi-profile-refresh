@@ -1,8 +1,8 @@
-captured: 2026-09-11T17:22:09Z
+captured: 2026-09-11T17:37:56Z
 NAME                  MEM USAGE / LIMIT     CPU %
-fansapi-app-1         77.8MiB / 62.58GiB    0.02%
-fansapi-fixture-1     27.47MiB / 62.58GiB   0.02%
-fansapi-horizon-1     369.8MiB / 62.58GiB   0.15%
-fansapi-mysql-1       519.6MiB / 62.58GiB   0.25%
-fansapi-redis-1       10MiB / 62.58GiB      0.14%
-fansapi-scheduler-1   41.69MiB / 62.58GiB   0.04%
+fansapi-app-1         77.47MiB / 62.58GiB   0.01%
+fansapi-fixture-1     30.28MiB / 62.58GiB   0.03%
+fansapi-horizon-1     344.7MiB / 62.58GiB   0.11%
+fansapi-mysql-1       550.8MiB / 62.58GiB   0.30%
+fansapi-redis-1       10.76MiB / 62.58GiB   1.70%
+fansapi-scheduler-1   41.59MiB / 62.58GiB   0.03%

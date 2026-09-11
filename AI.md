@@ -74,7 +74,19 @@ These were real defects found by running the thing, not hypotheticals:
    model, and the remaining dependencies are constructor-injected.
 10. **`abort_unless()` inside a queue job.** It throws an HTTP exception, which
     means nothing in a worker. Replaced with a plain `RuntimeException`.
-11. **A long-lived worker kept running old code.** A memory run was measured
+11. **Listeners registered twice.** Laravel discovers classes in
+    `app/Listeners` from their `handle()` type hints, and the provider also
+    registered them with `Event::listen`, so the memory probe wrote two
+    samples per job (250 for 125 deliveries) and the dead-letter linker ran
+    twice. Found because the sample count did not match the delivery count.
+    Fix: the provider registers nothing; `event:list` confirms one entry each.
+12. **A memory change that measured nothing.** Loading the profile without
+    its snapshot in the job is the right shape, but an A/B on a second pass
+    with ~880 KB stored snapshots showed the same 18 MiB peak either way. The
+    writer still loads the snapshot under its lock, and the peak counter
+    reports in 2 MiB pages. Recorded as "kept, no measurable effect" rather
+    than claimed as an improvement.
+13. **A long-lived worker kept running old code.** A memory run was measured
    against a stale worker and produced numbers that contradicted the code.
    Fix: the evidence script runs `horizon:terminate` before measuring.
 
