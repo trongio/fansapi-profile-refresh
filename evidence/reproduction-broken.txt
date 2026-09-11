@@ -1,18 +1,18 @@
 $ dc php artisan fans:demo broken --wait=120
-started: 2026-09-11T16:40:52Z
+started: 2026-09-11T17:17:18Z
 ----------------------------------------------------------------
 
 Mode: broken  (expectation: a response we cannot validate must preserve the last valid snapshot)
 +-------------------+--------------+-----------------+---------------------+--------------+--------------------+-------------+
 | case              | stored likes | stored revision | last success        | last failure | expected likes/rev | verdict     |
 +-------------------+--------------+-----------------+---------------------+--------------+--------------------+-------------+
-| case-new-format   | 0            | 9               | 2026-09-11 16:40:54 | -            | 121000 / 11        | ZEROED      |
-| case-old-format   | 120000       | 9               | 2026-09-11 16:40:54 | -            | 120000 / 10        | NOT APPLIED |
-| case-server-error | 0            | 9               | 2026-09-11 16:40:54 | -            | 120000 / 9         | ZEROED      |
-| case-throttled    | 0            | 9               | 2026-09-11 16:40:54 | -            | 120000 / 9         | ZEROED      |
+| case-new-format   | 0            | 9               | 2026-09-11 17:17:21 | -            | 121000 / 11        | ZEROED      |
+| case-old-format   | 120000       | 9               | 2026-09-11 17:17:21 | -            | 120000 / 10        | NOT APPLIED |
+| case-server-error | 0            | 9               | 2026-09-11 17:17:21 | -            | 120000 / 9         | ZEROED      |
+| case-throttled    | 0            | 9               | 2026-09-11 17:17:21 | -            | 120000 / 9         | ZEROED      |
 +-------------------+--------------+-----------------+---------------------+--------------+--------------------+-------------+
 4 of 4 cases did not end with the expected accepted data (3 were overwritten with zero), and all 4 were recorded as successful refreshes.
 This is the reproduction. Exit status 1 is the expected result here.
 ----------------------------------------------------------------
 exit status: 1
-elapsed: 2s
+elapsed: 3s

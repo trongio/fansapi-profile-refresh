@@ -35,26 +35,12 @@ abstract class TestCase extends BaseTestCase
 
     protected function account(string $key = 'A', array $attributes = []): Account
     {
-        return Account::create(array_merge([
-            'key' => $key,
-            'label' => "Account {$key}",
-            'queue' => 'refresh-'.strtolower($key),
-            'source' => 'fixture',
-            'workspace' => 'test',
-        ], $attributes));
+        return Account::factory()->key($key)->create($attributes);
     }
 
     protected function profile(Account $account, string $username, array $attributes = []): Profile
     {
-        return Profile::create(array_merge([
-            'account_id' => $account->id,
-            'username' => $username,
-            'display_name' => $username,
-            'likes' => 120000,
-            'revision' => 9,
-            'snapshot' => ['likes' => 120000],
-            'snapshot_source' => 'seed',
-        ], $attributes));
+        return Profile::factory()->for($account)->create(['username' => $username, 'display_name' => $username] + $attributes);
     }
 
     /** Push a scenario to the private fixture upstream used by the tests. */

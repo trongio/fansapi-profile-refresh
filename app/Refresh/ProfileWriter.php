@@ -130,7 +130,7 @@ class ProfileWriter
             'completed_at' => Carbon::now(),
         ])->save();
 
-        app(DeadLetters::class)->markResolved($run);
+        $run->resolveReplayedOriginal();
 
         // Only clear the pending pointer if it still points at THIS run, so a
         // late finisher cannot wipe a newer run's pending state.

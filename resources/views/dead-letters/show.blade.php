@@ -54,7 +54,7 @@
         <h3 class="mb-3 font-semibold">Replays</h3>
         <ul class="mb-8 list-inside list-disc text-sm">
             @foreach ($run->replays as $replay)
-                <li>Run {{ $replay->id }} &mdash; {{ $replay->status }} ({{ $replay->outcome_category ?? 'in flight' }})</li>
+                <li>Run {{ $replay->id }} &mdash; {{ $replay->status->label() }} ({{ $replay->outcome_category ?? 'in flight' }})</li>
             @endforeach
         </ul>
     @endif

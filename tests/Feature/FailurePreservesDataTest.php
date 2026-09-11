@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\RunStatus;
 use App\Models\Profile;
 use App\Models\RefreshRun;
 use App\Refresh\Outcome;
@@ -38,7 +39,7 @@ class FailurePreservesDataTest extends TestCase
 
         $this->assertSame(Outcome::THROTTLED, $run->attempts()->first()->category);
         $this->assertNull($run->attempts()->first()->retry_after_seconds);
-        $this->assertSame(RefreshRun::STATUS_QUEUED, $run->status); // released, not failed
+        $this->assertSame(RunStatus::Queued, $run->status); // released, not failed
         $this->assertPreserved();
     }
 
@@ -77,7 +78,7 @@ class FailurePreservesDataTest extends TestCase
 
         $this->assertSame(Outcome::SCHEMA_FAILURE, $run->outcome_category);
         // A payload we cannot validate is quarantined for inspection, not retried.
-        $this->assertSame(RefreshRun::STATUS_DEAD_LETTERED, $run->status);
+        $this->assertSame(RunStatus::DeadLettered, $run->status);
         $this->assertNotNull($run->failed_job_uuid);
         $this->assertPreserved();
     }

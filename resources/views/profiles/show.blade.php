@@ -48,7 +48,7 @@
                 <tr>
                     <td class="px-5 py-3 tabular-nums">{{ $run->id }}</td>
                     <td class="px-5 py-3">{{ $run->trigger }}</td>
-                    <td class="px-5 py-3">{{ $run->status }}</td>
+                    <td class="px-5 py-3">{{ $run->status->label() }}</td>
                     <td class="px-5 py-3">{{ $run->outcome_category ?? '-' }}</td>
                     <td class="px-5 py-3 tabular-nums">{{ $run->deliveries }}</td>
                     <td class="px-5 py-3 tabular-nums">{{ $run->requests_used }}</td>

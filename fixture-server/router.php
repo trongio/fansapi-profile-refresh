@@ -12,7 +12,6 @@
  * Scenario state is one JSON file written by `php artisan fans:demo`, so the
  * same file drives the tests, the workload and the call demo.
  */
-
 const STATE_DIR = '/var/www/html/storage/fixture';
 
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';

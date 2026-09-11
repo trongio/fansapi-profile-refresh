@@ -13,8 +13,11 @@ Open exactly two browser tabs:
 
 | Tab | URL | What to point at |
 | --- | --- | --- |
-| App | http://localhost:8000 | The **Account activity** panel at the top, and the **Last valid likes** column |
-| Horizon | http://localhost:8000/horizon | *Dashboard* for jobs per minute and processes, *Pending Jobs*, *Failed Jobs* |
+| App | http://127.0.0.1:8000 | The **Account activity** panel at the top, and the **Last valid likes** column |
+| Horizon | http://127.0.0.1:8000/horizon | *Dashboard* for jobs per minute and processes, *Pending Jobs*, *Failed Jobs* |
+
+Use `127.0.0.1`, not `localhost`: Chrome on this machine has a cached redirect
+for `localhost:8000` from an earlier project that sends it to `/ka`.
 
 In Horizon, **Dashboard** shows the supervisors and the process count per queue.
 `refresh-a` and `refresh-b` each have one process; that is the reserved capacity.
@@ -110,7 +113,7 @@ Permanent throttling exhausts the request budget, the run is dead-lettered into
 `failed_jobs` with the profile's 120000 preserved, the fixture is repaired, one
 replay is queued, a second concurrent replay request is refused, and the replay
 commits 121000 at revision 11. The original stays dead-lettered and is marked
-resolved. Visible at http://localhost:8000/dead-letters.
+resolved. Visible at http://127.0.0.1:8000/dead-letters.
 
 ## File map
 
@@ -126,6 +129,9 @@ The request path is: **UI, CLI or scheduler → `RefreshDispatcher` → Redis �
 | `app/Refresh/CountValue.php` | The explicit likes/revision rule: what counts as a number and what does not. |
 | `app/Refresh/ProfileWriter.php` | The only writer of accepted data: one short transaction, revision re-checked under the lock, idempotent completion. |
 | `app/Refresh/DeadLetters.php` | The dead-letter list over `failed_jobs`, and the replay action that keeps the original failure. |
+| `app/Enums/RunStatus.php` | The run lifecycle as a backed enum, cast on the model, with the terminal/committed/active sets. |
+| `app/Listeners/LinkDeadLetterToRun.php` | On `JobFailed`, links the framework failure record to the refresh run. |
+| `app/Console/Commands/DispatchDueCommand.php` | The every-minute scheduler entry that enqueues due profiles. |
 | `app/Demo/BrokenRefreshJob.php` | The pre-fix handler, quarantined in the demo namespace. |
 | `config/horizon.php` | Two reserved supervisors plus the baseline supervisor, with the timeout ordering spelled out. |
 | `config/fansapi.php` | Every timeout, budget and interval the README quotes. |

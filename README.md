@@ -25,8 +25,8 @@ docker compose exec app php artisan fans:demo seed
 
 | What | Where |
 | --- | --- |
-| App | http://localhost:8000 |
-| Horizon | http://localhost:8000/horizon |
+| App | http://127.0.0.1:8000 |
+| Horizon | http://127.0.0.1:8000/horizon |
 | Fixture upstream | http://localhost:9000 (private, test only) |
 
 Everything else:
@@ -66,10 +66,24 @@ end through a queued job and a real Horizon worker
 | Served from provider cache | no (`fresh=true`) |
 
 **This uses a managed provider**, `app.onlyfansapi.com`. It owns request
-signing and session maintenance; none of that is implemented here. The
-assignment does not say whether that is acceptable or whether direct OnlyFans
-access was expected, so it is disclosed rather than hidden. A direct adapter
-would slot in behind the same `ProfileClient` interface.
+signing and session maintenance; none of that is implemented here.
+
+The reviewer's follow-up said to treat OnlyFans as the upstream HTTP source,
+that no OnlyFans account is needed, and that fixtures for the failure modes
+plus a live happy-path check are fine. So the direct route was probed as well,
+anonymously, from this machine:
+
+| Route | Result |
+| --- | --- |
+| `GET https://onlyfans.com/api2/v2/users/madison420ivy` | HTTP 400, `{"error":{"code":0,"message":"Something went wrong."}}` |
+| `GET https://onlyfans.com/madison420ivy` | HTTP 200, a 17 KB JavaScript app shell with no profile fields in it |
+
+Direct JSON access needs the signed `app-token` / `sign` / `time` headers that
+the scraper projects reverse-engineer from OnlyFans' dynamic rules, and the
+HTML page renders client-side. Neither gives anonymous profile data, which is
+why the managed provider is the live adapter. A direct adapter would slot in
+behind the same `ProfileClient` interface once signing exists; the rest of the
+pipeline is unchanged by where the JSON comes from.
 
 **`favoritedCount` versus `favoritesCount`.** The first is 605,782 and the
 second is 16 for this profile, which is only consistent with the first being
@@ -199,8 +213,8 @@ workers in both.
 
 | Account | Runs | Valid refreshes | False successes | Peak oldest wait |
 | --- | --- | --- | --- | --- |
-| A | 12 | 0 | 12 | 12s |
-| B | 4 | 0 | 4 | 11s |
+| A | 12 | 0 | 12 | 11s |
+| B | 4 | 0 | 4 | 10s |
 
 All 12 A profiles were overwritten with 0. B's likes survived only because the
 old format still happened to parse, and its revision never advanced past 9.
@@ -209,14 +223,14 @@ old format still happened to parse, and its revision never advanced past 9.
 
 | Account | Runs | Valid refreshes | Upstream requests | Requests per valid refresh | Retries scheduled | Dead letters | Peak oldest wait |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| A | 12 | 12 | 15 | 1.25 | 26 | 0 | 52s |
-| B | 4 | 4 | 4 | 1.00 | 0 | 0 | **0s** |
+| A | 12 | 12 | 15 | 1.25 | 27 | 0 | 52s |
+| B | 4 | 4 | 4 | 1.00 | 0 | 0 | **3s** |
 
 B keeps recording valid refreshes while A is failing, and A fully recovers once
 the outage ends: all 12 profiles end at 121000, revision 11, and all 4 B
 profiles at 120500, revision 10. The healthy account's peak observed waiting age
-drops from 11s to 0s purely from reserving its worker: with a worker of its
-own, B was never sampled with work still waiting.
+drops from 10s to 3s purely from reserving its worker. Run-to-run noise on this
+machine is a second or two; the earlier capture showed 11s against 0s.
 
 Waiting age is measured from the original enqueue time and survives every
 release; it is never inferred from a delayed job's next-ready timestamp. Ready,
@@ -272,6 +286,25 @@ recorded separately in `evidence/compose-usage.txt`; the Horizon container's
 320 MiB covers a master plus four worker processes, which is why per-worker RSS
 is the number quoted here.
 
+## How the code is laid out
+
+Ordinary Laravel, on purpose. Queue jobs, Eloquent models with casts and
+factories, a backed enum for run status, event listeners registered in the
+service provider, artisan commands on the scheduler, form posts with CSRF,
+Blade views, PHPUnit with `RefreshDatabase`. No custom event bus, repository
+layer or workflow engine.
+
+| Layer | Where |
+| --- | --- |
+| Entry points | `routes/web.php`, `routes/console.php`, `app/Console/Commands/` |
+| Queue job | `app/Jobs/RefreshProfileJob.php` |
+| Domain services | `app/Refresh/` (dispatcher, clients, normalizer, writer, recorder, dead letters, admission, stats) |
+| Models and enum | `app/Models/`, `app/Enums/RunStatus.php` |
+| Listeners | `app/Listeners/` (dead-letter linking, memory probe) |
+| Demo-only code | `app/Demo/` (the broken handler, workload, seed data) |
+| Fixture upstream | `fixture-server/router.php` |
+| Tests | `tests/Unit/`, `tests/Feature/`, factories in `database/factories/` |
+
 ## Interface
 
 Blade and Tailwind, local-only, no SPA. A per-account activity panel polling a
@@ -285,6 +318,11 @@ Horizon is the operational view for supervisors, process counts, queue depths,
 throughput and failed jobs. Jobs are tagged `run:<id>`, with no secrets in tags.
 The panel separates queue completions from accepted refreshes and surfaces
 stale processing leases, so a crashed attempt does not look busy forever.
+
+Exercised in a real browser with Playwright as well (`evidence/browser-run.txt`):
+queue a refresh, the double-click dedupe, search, the retrying profile still
+showing its last valid likes, and a dead letter replayed to a valid commit,
+with zero console errors.
 
 Logs are structured and connect account, profile, run, queue job and attempt
 ids, with distinct events for `request_failed`, `retry_scheduled`,

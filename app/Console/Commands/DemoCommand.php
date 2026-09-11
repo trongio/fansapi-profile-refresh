@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Demo\BaselineDispatcher;
 use App\Demo\DemoData;
 use App\Demo\FixtureScenario;
 use App\Demo\Workload;
@@ -12,7 +13,6 @@ use App\Refresh\DeadLetters;
 use App\Refresh\QueueStats;
 use App\Refresh\RefreshDispatcher;
 use Illuminate\Console\Command;
-use Illuminate\Support\Carbon;
 
 /**
  * The single entry point for the interview.
@@ -25,12 +25,11 @@ use Illuminate\Support\Carbon;
  *   php artisan fans:demo dlq                  paginated dead-letter list
  *   php artisan fans:demo replay --run=ID      replay one dead letter
  *   php artisan fans:demo live                 EXPLICIT live provider fetch
- *   php artisan fans:demo reconcile            recover abandoned claims
  */
 class DemoCommand extends Command
 {
     protected $signature = 'fans:demo
-        {action : seed|state|broken|fixed|workload|dlq|dlq-demo|replay|live|reconcile}
+        {action : seed|state|broken|fixed|workload|dlq|dlq-demo|replay|live}
         {--mode=fixed : workload mode (broken|fixed)}
         {--run= : refresh run id for replay}
         {--wait=90 : seconds to wait for background workers}
@@ -39,10 +38,16 @@ class DemoCommand extends Command
 
     protected $description = 'FansAPI demo: seed, reproduce, fix, measure, replay.';
 
+    public function __construct(
+        private readonly RefreshDispatcher $dispatcher,
+        private readonly BaselineDispatcher $baseline,
+    ) {
+        parent::__construct();
+    }
+
     public function handle(
         DemoData $data,
         FixtureScenario $fixtures,
-        RefreshDispatcher $dispatcher,
         DeadLetters $dlq,
         QueueStats $stats,
         Workload $workload,
@@ -56,8 +61,7 @@ class DemoCommand extends Command
             'dlq' => $this->dlq($dlq),
             'dlq-demo' => $this->dlqDemo($data, $fixtures, $dlq),
             'replay' => $this->replay($dlq),
-            'live' => $this->live($dispatcher),
-            'reconcile' => $this->reconcile($dispatcher),
+            'live' => $this->live(),
             default => $this->fail('unknown action'),
         };
     }
@@ -126,8 +130,8 @@ class DemoCommand extends Command
 
         foreach ($profiles as $profile) {
             $mode === 'broken'
-                ? $this->dispatchBroken($profile)
-                : app(RefreshDispatcher::class)->enqueue($profile, 'cli');
+                ? $this->baseline->enqueue($profile)
+                : $this->dispatcher->enqueue($profile, 'cli');
         }
 
         $this->waitForSettled((int) $this->option('wait'), $profiles->pluck('id')->all());
@@ -184,24 +188,6 @@ class DemoCommand extends Command
         $this->info('All four cases preserved or advanced data correctly.');
 
         return self::SUCCESS;
-    }
-
-    private function dispatchBroken(Profile $profile): bool
-    {
-        $now = Carbon::now();
-        $run = RefreshRun::create([
-            'profile_id' => $profile->id,
-            'account_id' => $profile->account_id,
-            'status' => RefreshRun::STATUS_QUEUED,
-            'trigger' => 'cli',
-            'enqueued_at' => $now,
-            'deadline_at' => $now->copy()->addMinutes(5),
-            'claim_token' => (string) \Illuminate\Support\Str::uuid(),
-        ]);
-        $profile->forceFill(['pending_run_id' => $run->id])->save();
-        \App\Demo\BrokenRefreshJob::dispatch($run->id)->onQueue('refresh-broken');
-
-        return true;
     }
 
     private function workload(Workload $workload): int
@@ -266,13 +252,13 @@ class DemoCommand extends Command
 
         $this->line('1. upstream is permanently throttled for a-01');
         $fixtures->push(['profiles' => ['a-01' => ['status' => 429, 'body' => '']]]);
-        app(RefreshDispatcher::class)->enqueue($profile, 'cli');
+        $this->dispatcher->enqueue($profile, 'cli');
         $this->waitForSettled((int) $this->option('wait'), [$profile->id]);
 
         $original = RefreshRun::where('profile_id', $profile->id)->orderByDesc('id')->firstOrFail();
         $this->table(['field', 'value'], [
             ['run', $original->id],
-            ['status', $original->status],
+            ['status', $original->status->value],
             ['reason', $original->outcome_message],
             ['upstream requests', $original->requests_used],
             ['queue deliveries', $original->deliveries],
@@ -297,11 +283,11 @@ class DemoCommand extends Command
 
         $this->table(['field', 'value'], [
             ['replay run', $replay->id],
-            ['replay status', $replay->status],
+            ['replay status', $replay->status->value],
             ['stored likes', $profile->likes],
             ['stored revision', $profile->revision],
             ['last success', $profile->last_success_at?->toDateTimeString() ?? 'never'],
-            ['original run status', $original->status.' (kept for the audit trail)'],
+            ['original run status', $original->status->value.' (kept for the audit trail)'],
             ['original resolved at', $original->resolved_at?->toDateTimeString() ?? 'not resolved'],
             ['duplicate active replays', RefreshRun::where('replay_of_run_id', $original->id)->count()],
         ]);
@@ -335,7 +321,7 @@ class DemoCommand extends Command
     }
 
     /** Deliberately separate: no other action ever touches the live provider. */
-    private function live(RefreshDispatcher $dispatcher): int
+    private function live(): int
     {
         $profile = Profile::whereHas('account', fn ($q) => $q->where('source', 'ofapi'))->first();
         if ($profile === null) {
@@ -351,7 +337,7 @@ class DemoCommand extends Command
         }
 
         $profile->forceFill(['pending_run_id' => null, 'terminal_failed_at' => null])->save();
-        $run = $dispatcher->enqueue($profile, 'cli');
+        $run = $this->dispatcher->enqueue($profile, 'cli');
         if ($run === null) {
             $this->error('profile already has pending work');
 
@@ -365,7 +351,7 @@ class DemoCommand extends Command
         $profile->refresh();
 
         $this->table(['field', 'value'], [
-            ['run status', $run->status],
+            ['run status', $run->status->value],
             ['outcome', $run->outcome_category ?? '-'],
             ['upstream requests', $run->requests_used],
             ['profile id (upstream)', $profile->upstream_id ?? '-'],
@@ -379,19 +365,11 @@ class DemoCommand extends Command
         ]);
 
         $this->writeJson([
-            'run' => $run->only(['id', 'status', 'outcome_category', 'requests_used']),
+            'run' => ['id' => $run->id, 'status' => $run->status->value] + $run->only(['outcome_category', 'requests_used']),
             'profile' => $profile->only(['username', 'upstream_id', 'likes', 'revision', 'last_success_at', 'next_refresh_at']),
         ]);
 
         return $run->isCommitted() ? self::SUCCESS : self::FAILURE;
-    }
-
-    private function reconcile(RefreshDispatcher $dispatcher): int
-    {
-        $result = $dispatcher->reconcile();
-        $this->info("redispatched: {$result['redispatched']}, expired: {$result['expired']}");
-
-        return self::SUCCESS;
     }
 
     /** @param array<int> $profileIds */

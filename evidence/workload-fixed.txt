@@ -1,5 +1,5 @@
 $ dc php artisan fans:demo workload --mode=fixed --wait=180 --json=evidence/workload-fixed.json
-started: 2026-09-11T16:42:37Z
+started: 2026-09-11T17:19:13Z
 ----------------------------------------------------------------
   mode=fixed: resetting demo data
   fixture scenario pushed; scenario clock started
@@ -8,13 +8,13 @@ started: 2026-09-11T16:42:37Z
   account B profile b-02 queued at t=4.2s
   account B profile b-03 queued at t=7.3s
   account B profile b-04 queued at t=10.3s
-  workload finished after 53.4s
+  workload finished after 52.4s
 
 +---------+------+-----------------+-----------------+---------------+--------------------+---------+------+----------------------+-----------------------+
 | account | runs | valid refreshes | false successes | upstream reqs | reqs/valid refresh | retries | dead | peak oldest wait (s) | final oldest wait (s) |
 +---------+------+-----------------+-----------------+---------------+--------------------+---------+------+----------------------+-----------------------+
-| A       | 12   | 12              | 0               | 15            | 1.25               | 26      | 0    | 52                   | -                     |
-| B       | 4    | 4               | 0               | 4             | 1                  | 0       | 0    | 0                    | -                     |
+| A       | 12   | 12              | 0               | 15            | 1.25               | 27      | 0    | 52                   | -                     |
+| B       | 4    | 4               | 0               | 4             | 1                  | 0       | 0    | 3                    | -                     |
 +---------+------+-----------------+-----------------+---------------+--------------------+---------+------+----------------------+-----------------------+
 wrote evidence/workload-fixed.json
 ----------------------------------------------------------------

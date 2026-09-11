@@ -3,6 +3,7 @@
 namespace App\Refresh\Clients;
 
 use App\Models\Profile;
+use App\Refresh\Outcome;
 
 /**
  * Live managed provider (app.onlyfansapi.com).
@@ -25,7 +26,7 @@ class OfapiProfileClient extends BoundedHttpClient implements ProfileClient
         $identifier = $profile->upstream_id ?: $profile->username;
 
         if ($token === '') {
-            return new ClientResult(\App\Refresh\Outcome::INVALID_CREDENTIALS, null, null, 0,
+            return new ClientResult(Outcome::INVALID_CREDENTIALS, null, null, 0,
                 message: 'OFAPI_TOKEN is not configured');
         }
 

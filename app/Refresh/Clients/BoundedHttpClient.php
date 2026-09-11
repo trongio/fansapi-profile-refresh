@@ -19,6 +19,7 @@ use Psr\Http\Message\StreamInterface;
 abstract class BoundedHttpClient
 {
     private const CHUNK = 8192;
+
     private const JSON_DEPTH = 32;
 
     /** @param array<string,string> $headers */

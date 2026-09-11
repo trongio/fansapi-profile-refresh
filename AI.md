@@ -67,9 +67,37 @@ These were real defects found by running the thing, not hypotheticals:
    quietly used half the capacity it claimed. Found by counting the actual
    processes in the container rather than trusting the config. Fix: both bounds
    are pinned, and the workload evidence was regenerated.
-9. **A long-lived worker kept running old code.** A memory run was measured
+9. **Service-location cycle.** `ProfileWriter` and `RunRecorder` reached for
+   `app(DeadLetters::class)` because injecting it would have created a cycle
+   (`DeadLetters -> RefreshDispatcher -> RunRecorder -> DeadLetters`). Caught in
+   the paradigm review; the replay-resolution step moved onto the `RefreshRun`
+   model, and the remaining dependencies are constructor-injected.
+10. **`abort_unless()` inside a queue job.** It throws an HTTP exception, which
+    means nothing in a worker. Replaced with a plain `RuntimeException`.
+11. **A long-lived worker kept running old code.** A memory run was measured
    against a stale worker and produced numbers that contradicted the code.
    Fix: the evidence script runs `horizon:terminate` before measuring.
+
+## Review pass after the first submission
+
+A second pass checked the code against ordinary Laravel conventions and made
+these changes, all covered by the same 59 tests:
+
+- run status is a backed enum (`App\Enums\RunStatus`) cast on the model,
+  instead of string constants;
+- factories for `Account` and `Profile`, used by every test;
+- the `Queue::failing` closure became `App\Listeners\LinkDeadLetterToRun`;
+- the scheduler runs `fans:dispatch-due` and `fans:reconcile` commands rather
+  than closures;
+- the `due` scope uses the `#[Scope]` attribute;
+- Laravel Pint was run.
+
+The same pass drove the UI with Playwright (`evidence/browser-run.txt`) and
+scanned every tracked file for prompt-injection content: instruction-like
+text aimed at an AI, zero-width or bidirectional Unicode, hidden HTML. Nothing
+was found. Upstream profile text (the `about` field, for instance) is stored in
+the JSON snapshot and is never rendered by any view; if it ever were, Blade's
+escaping applies.
 
 ## What remains unverified
 

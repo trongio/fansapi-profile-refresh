@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\RunStatus;
 use App\Models\Profile;
 use App\Models\RefreshRun;
 use App\Refresh\RefreshDispatcher;
@@ -113,7 +114,7 @@ class SchedulingTest extends TestCase
         $result = $this->dispatcher->reconcile();
 
         $this->assertSame(1, $result['expired']);
-        $this->assertSame(RefreshRun::STATUS_FAILED, $run->fresh()->status);
+        $this->assertSame(RunStatus::Failed, $run->fresh()->status);
         // The failure preserved the accepted data and released the pointer.
         $this->assertSame(120000, $profile->fresh()->likes);
         $this->assertNull($profile->fresh()->pending_run_id);

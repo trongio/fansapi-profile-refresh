@@ -1,17 +1,17 @@
 {
     "jobs_requested": 100,
-    "samples_measured": 120,
+    "samples_measured": 250,
     "warmup_skipped": 10,
     "workers": [
         {
-            "pid": 68,
-            "jobs": 120,
+            "pid": 82,
+            "jobs": 250,
             "php_peak_bytes": 18874368,
-            "rss_max_bytes": 76673024
+            "rss_max_bytes": 76632064
         }
     ],
-    "rss_first_quarter_mean_bytes": 76673024,
-    "rss_last_quarter_mean_bytes": 76673024,
+    "rss_first_quarter_mean_bytes": 76624400,
+    "rss_last_quarter_mean_bytes": 76632064,
     "php_memory_limit": "128M",
     "horizon_worker_recycle_mib": 96
 }

@@ -2,8 +2,8 @@
 
 namespace App\Refresh;
 
+use App\Enums\RunStatus;
 use App\Models\RefreshRun;
-use Illuminate\Support\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
@@ -18,7 +18,10 @@ use Illuminate\Support\Facades\DB;
  */
 class DeadLetters
 {
-    public function __construct(private readonly RefreshDispatcher $dispatcher) {}
+    public function __construct(
+        private readonly RefreshDispatcher $dispatcher,
+        private readonly RunRecorder $recorder,
+    ) {}
 
     /** Link a failed queue job to its logical run and mark the run dead. */
     public function record(int $runId, string $jobUuid, \Throwable $e): void
@@ -33,7 +36,7 @@ class DeadLetters
         if ($run->isTerminal()) {
             $run->forceFill([
                 'failed_job_uuid' => $jobUuid,
-                'status' => RefreshRun::STATUS_DEAD_LETTERED,
+                'status' => RunStatus::DeadLettered,
             ])->save();
 
             return;
@@ -43,11 +46,11 @@ class DeadLetters
         // exception, or a timeout that killed the attempt mid-flight.
         $run->forceFill(['failed_job_uuid' => $jobUuid])->save();
 
-        app(RunRecorder::class)->failTerminally(
+        $this->recorder->failTerminally(
             $run,
             $run->outcome_category ?? Outcome::BUDGET_EXHAUSTED,
             substr($e->getMessage(), 0, 255),
-            RefreshRun::STATUS_DEAD_LETTERED,
+            RunStatus::DeadLettered,
         );
     }
 
@@ -56,26 +59,9 @@ class DeadLetters
     {
         return RefreshRun::query()
             ->with(['profile:id,username,likes,revision,last_success_at', 'account:id,key,label'])
-            ->whereIn('status', [RefreshRun::STATUS_DEAD_LETTERED, RefreshRun::STATUS_FAILED])
+            ->whereIn('status', RunStatus::deadLetterable())
             ->orderByDesc('completed_at')
             ->paginate($perPage);
-    }
-
-    /**
-     * Called when a replay finishes. The original keeps its dead-lettered
-     * status - the audit trail is the point - but it is now marked resolved,
-     * which is different from "a replay was queued".
-     */
-    public function markResolved(RefreshRun $replay): void
-    {
-        if ($replay->replay_of_run_id === null) {
-            return;
-        }
-
-        RefreshRun::query()->whereKey($replay->replay_of_run_id)->update([
-            'resolved_at' => Carbon::now(),
-            'outcome_message' => 'resolved by replay run '.$replay->id.' ('.$replay->status.')',
-        ]);
     }
 
     /** The raw framework record, for the detail view. */
@@ -98,13 +84,13 @@ class DeadLetters
      */
     public function replay(RefreshRun $original): array
     {
-        if (! in_array($original->status, [RefreshRun::STATUS_DEAD_LETTERED, RefreshRun::STATUS_FAILED], true)) {
+        if (! in_array($original->status, RunStatus::deadLetterable(), true)) {
             return ['run' => null, 'reason' => 'run did not fail terminally'];
         }
 
         $existing = RefreshRun::query()
             ->where('replay_of_run_id', $original->id)
-            ->whereNotIn('status', RefreshRun::TERMINAL)
+            ->whereNotIn('status', RunStatus::terminal())
             ->first();
 
         if ($existing !== null) {

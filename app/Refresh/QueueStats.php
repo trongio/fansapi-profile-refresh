@@ -2,6 +2,7 @@
 
 namespace App\Refresh;
 
+use App\Enums\RunStatus;
 use App\Models\Account;
 use App\Models\RefreshRun;
 use Illuminate\Support\Carbon;
@@ -38,7 +39,7 @@ class QueueStats
 
         $runs = RefreshRun::query()->where('account_id', $account->id);
 
-        $pending = (clone $runs)->whereIn('status', [RefreshRun::STATUS_QUEUED, RefreshRun::STATUS_RUNNING]);
+        $pending = (clone $runs)->whereIn('status', RunStatus::active());
         $oldest = (clone $pending)->min('enqueued_at');
 
         $latest = (clone $runs)->orderByDesc('id')->first(['status', 'outcome_category', 'completed_at']);
@@ -50,25 +51,25 @@ class QueueStats
             'ready' => $depth['ready'],
             'delayed' => $depth['delayed'],
             'reserved' => $depth['reserved'],
-            'in_progress' => (clone $runs)->where('status', RefreshRun::STATUS_RUNNING)->count(),
+            'in_progress' => (clone $runs)->where('status', RunStatus::Running)->count(),
             // Valid refreshes = committed logical runs, not completed queue jobs.
             'valid_refreshes' => (clone $runs)
-                ->whereIn('status', [RefreshRun::STATUS_SUCCEEDED, RefreshRun::STATUS_VERIFIED_UNCHANGED])
+                ->whereIn('status', RunStatus::committed())
                 ->where('outcome_category', '!=', 'broken_false_success')
                 ->count(),
             'data_updates' => (clone $runs)
-                ->where('status', RefreshRun::STATUS_SUCCEEDED)
+                ->where('status', RunStatus::Succeeded)
                 ->where('outcome_category', '!=', 'broken_false_success')
                 ->count(),
             // Retries = scheduled retries (releases), i.e. deliveries beyond the first.
             'retries_scheduled' => max(0, (int) (clone $runs)->sum('deliveries') - (clone $runs)->count()),
             'upstream_requests' => (int) (clone $runs)->sum('requests_used'),
-            'dead_letters' => (clone $runs)->where('status', RefreshRun::STATUS_DEAD_LETTERED)->count(),
+            'dead_letters' => (clone $runs)->where('status', RunStatus::DeadLettered)->count(),
             'oldest_waiting_seconds' => $oldest ? max(0, $now->getTimestamp() - Carbon::parse($oldest)->getTimestamp()) : null,
             'cooldown_seconds' => $account->cooldown_until && $account->cooldown_until->gt($now)
                 ? $account->cooldown_until->getTimestamp() - $now->getTimestamp()
                 : 0,
-            'latest_status' => $latest?->status,
+            'latest_status' => $latest?->status->value,
             'latest_outcome' => $latest?->outcome_category,
         ];
     }
@@ -80,7 +81,7 @@ class QueueStats
     public function staleLeases(): int
     {
         return RefreshRun::query()
-            ->where('status', RefreshRun::STATUS_RUNNING)
+            ->where('status', RunStatus::Running)
             ->where('updated_at', '<=', Carbon::now()->subSeconds((int) config('fansapi.refresh.lease_seconds')))
             ->count();
     }

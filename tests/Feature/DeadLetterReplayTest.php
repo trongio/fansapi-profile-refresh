@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\RunStatus;
 use App\Models\Profile;
 use App\Models\RefreshRun;
 use App\Refresh\DeadLetters;
@@ -52,7 +53,7 @@ class DeadLetterReplayTest extends TestCase
 
         $run = $this->drain();
 
-        $this->assertSame(RefreshRun::STATUS_DEAD_LETTERED, $run->status);
+        $this->assertSame(RunStatus::DeadLettered, $run->status);
         $this->assertNotNull($run->failed_job_uuid);
         $this->assertSame(1, DB::table('failed_jobs')->where('uuid', $run->failed_job_uuid)->count());
 
@@ -80,7 +81,7 @@ class DeadLetterReplayTest extends TestCase
         $this->assertSame(1, RefreshRun::where('replay_of_run_id', $original->id)->count());
 
         // Queuing a replay does NOT resolve the original failure.
-        $this->assertSame(RefreshRun::STATUS_DEAD_LETTERED, $original->fresh()->status);
+        $this->assertSame(RunStatus::DeadLettered, $original->fresh()->status);
         $this->assertNull($original->fresh()->resolved_at);
     }
 
@@ -101,9 +102,9 @@ class DeadLetterReplayTest extends TestCase
         $this->assertSame(11, $this->profile->revision);
         $this->assertNotNull($this->profile->last_success_at);
 
-        $this->assertSame(RefreshRun::STATUS_SUCCEEDED, $replay->fresh()->status);
+        $this->assertSame(RunStatus::Succeeded, $replay->fresh()->status);
         // The original stays dead-lettered for the audit trail, but is resolved.
-        $this->assertSame(RefreshRun::STATUS_DEAD_LETTERED, $original->fresh()->status);
+        $this->assertSame(RunStatus::DeadLettered, $original->fresh()->status);
         $this->assertNotNull($original->fresh()->resolved_at);
     }
 

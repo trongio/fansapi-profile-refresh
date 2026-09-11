@@ -2,6 +2,7 @@
 
 namespace App\Demo;
 
+use App\Enums\RunStatus;
 use App\Models\Account;
 use App\Models\Profile;
 use App\Models\RefreshRun;
@@ -9,7 +10,6 @@ use App\Refresh\QueueStats;
 use App\Refresh\RefreshDispatcher;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * The repeatable A/B workload. Both modes get IDENTICAL fixture inputs and the
@@ -35,6 +35,7 @@ class Workload
         private readonly FixtureScenario $fixtures,
         private readonly RefreshDispatcher $dispatcher,
         private readonly QueueStats $stats,
+        private readonly BaselineDispatcher $baseline,
     ) {}
 
     /**
@@ -127,22 +128,7 @@ class Workload
             return $this->dispatcher->enqueue($profile, 'cli');
         }
 
-        // Baseline: same logical run row, but the pre-fix handler on a shared queue.
-        $now = Carbon::now();
-        $run = RefreshRun::create([
-            'profile_id' => $profile->id,
-            'account_id' => $profile->account_id,
-            'status' => RefreshRun::STATUS_QUEUED,
-            'trigger' => 'cli',
-            'enqueued_at' => $now,
-            'deadline_at' => $now->copy()->addMinutes(5),
-            'claim_token' => (string) Str::uuid(),
-        ]);
-        $profile->forceFill(['pending_run_id' => $run->id])->save();
-
-        BrokenRefreshJob::dispatch($run->id)->onQueue('refresh-broken');
-
-        return $run;
+        return $this->baseline->enqueue($profile);
     }
 
     /** Identical inputs for both modes. */
@@ -190,7 +176,7 @@ class Workload
 
     private function allSettled(): bool
     {
-        return ! RefreshRun::query()->whereIn('status', [RefreshRun::STATUS_QUEUED, RefreshRun::STATUS_RUNNING])->exists();
+        return ! RefreshRun::query()->whereIn('status', RunStatus::active())->exists();
     }
 
     /** @param array<int,array<string,mixed>> $samples */
@@ -200,7 +186,7 @@ class Workload
         // A completed queue job is NOT a valid refresh. The baseline handler
         // marks everything succeeded, so its runs are counted separately.
         $valid = (clone $runs)
-            ->whereIn('status', [RefreshRun::STATUS_SUCCEEDED, RefreshRun::STATUS_VERIFIED_UNCHANGED])
+            ->whereIn('status', RunStatus::committed())
             ->where('outcome_category', '!=', 'broken_false_success')
             ->count();
         $requests = (int) (clone $runs)->sum('requests_used');
@@ -216,7 +202,7 @@ class Workload
             'upstream_requests' => $requests,
             'attempts_per_valid_refresh' => $valid > 0 ? round($requests / $valid, 2) : null,
             'retries_scheduled' => max(0, (int) (clone $runs)->sum('deliveries') - (clone $runs)->count()),
-            'dead_letters' => (clone $runs)->where('status', RefreshRun::STATUS_DEAD_LETTERED)->count(),
+            'dead_letters' => (clone $runs)->where('status', RunStatus::DeadLettered)->count(),
             'peak_oldest_waiting_seconds' => $ages->filter(fn ($v) => $v !== null)->max(),
             // null here means "no pending work left", not "age zero".
             'final_oldest_waiting_seconds' => $ages->last(),

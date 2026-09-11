@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\RunStatus;
 use App\Models\Profile;
 use App\Models\RefreshRun;
 use App\Refresh\NormalizedProfile;
@@ -82,7 +83,7 @@ class ConcurrentCommitTest extends TestCase
         $this->assertSame(121000, $profile->likes);
         $this->assertSame(11, $profile->revision);
         $this->assertSame(1, $profile->success_count);
-        $this->assertSame(RefreshRun::STATUS_STALE_IGNORED, $older->fresh()->status);
+        $this->assertSame(RunStatus::StaleIgnored, $older->fresh()->status);
     }
 
     private function newRun(Profile $profile): RefreshRun
@@ -90,7 +91,7 @@ class ConcurrentCommitTest extends TestCase
         return RefreshRun::create([
             'profile_id' => $profile->id,
             'account_id' => $profile->account_id,
-            'status' => RefreshRun::STATUS_QUEUED,
+            'status' => RunStatus::Queued,
             'trigger' => 'cli',
             'enqueued_at' => now(),
             'deadline_at' => now()->addMinutes(5),

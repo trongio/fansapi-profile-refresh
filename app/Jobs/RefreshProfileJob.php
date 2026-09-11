@@ -2,9 +2,11 @@
 
 namespace App\Jobs;
 
+use App\Enums\RunStatus;
 use App\Models\RefreshRun;
 use App\Refresh\Admission;
 use App\Refresh\Clients\ClientFactory;
+use App\Refresh\Clients\ClientResult;
 use App\Refresh\InvalidPayload;
 use App\Refresh\Outcome;
 use App\Refresh\ProfileNormalizer;
@@ -66,7 +68,7 @@ class RefreshProfileJob implements ShouldQueue
         // Replay of an already committed run: no second success, no timestamp
         // change, no side effect. This is the crash-after-commit case.
         if ($run->isTerminal()) {
-            $log->event('replay_ignored', $run, ['job_id' => $this->job?->uuid(), 'status' => $run->status]);
+            $log->event('replay_ignored', $run, ['job_id' => $this->job?->uuid(), 'status' => $run->status->value]);
 
             return;
         }
@@ -116,7 +118,7 @@ class RefreshProfileJob implements ShouldQueue
                 return;
             }
 
-            $run->forceFill(['status' => RefreshRun::STATUS_RUNNING])->save();
+            $run->forceFill(['status' => RunStatus::Running])->save();
 
             $client = $clients->for($run->account);
 
@@ -181,7 +183,7 @@ class RefreshProfileJob implements ShouldQueue
         $this->fail(new TerminalRefreshFailure($category, $message));
     }
 
-    private function handleThrottle(RefreshRun $run, \App\Refresh\Clients\ClientResult $result, Admission $admission, RefreshLogger $log): void
+    private function handleThrottle(RefreshRun $run, ClientResult $result, Admission $admission, RefreshLogger $log): void
     {
         $config = config('fansapi.backoff');
 
@@ -215,7 +217,7 @@ class RefreshProfileJob implements ShouldQueue
     private function releaseRun(RefreshRun $run, int $delay, string $reason, RefreshLogger $log, array $context = []): void
     {
         $run->forceFill([
-            'status' => RefreshRun::STATUS_QUEUED,
+            'status' => RunStatus::Queued,
             'outcome_category' => $reason,
             'available_at' => Carbon::now()->addSeconds($delay),
         ])->save();

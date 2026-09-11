@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\RunStatus;
 use App\Models\Profile;
 use App\Models\RefreshRun;
 use App\Refresh\InvalidPayload;
@@ -130,7 +131,7 @@ class DataProtectionTest extends TestCase
         $this->writer->commit($old, $this->incoming(121000, 11, 'a-01'), 'fixture');
 
         $this->assertSame($new->id, $profile->fresh()->pending_run_id);
-        $this->assertSame(RefreshRun::STATUS_QUEUED, $new->fresh()->status);
+        $this->assertSame(RunStatus::Queued, $new->fresh()->status);
     }
 
     #[Test]
@@ -150,7 +151,7 @@ class DataProtectionTest extends TestCase
         return RefreshRun::create([
             'profile_id' => $profile->id,
             'account_id' => $profile->account_id,
-            'status' => RefreshRun::STATUS_QUEUED,
+            'status' => RunStatus::Queued,
             'trigger' => 'cli',
             'enqueued_at' => now(),
             'deadline_at' => now()->addMinutes(5),

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -70,7 +71,8 @@ class Profile extends Model
      * Schedulable rows only: nothing already pending, nothing terminally
      * failed, and due at or before $now. Matches profiles_due_idx.
      */
-    public function scopeDue(Builder $query, \DateTimeInterface $now): Builder
+    #[Scope]
+    protected function due(Builder $query, \DateTimeInterface $now): Builder
     {
         return $query->whereNull('terminal_failed_at')
             ->whereNull('pending_run_id')

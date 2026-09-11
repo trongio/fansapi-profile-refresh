@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\RunStatus;
 use App\Models\Profile;
 use App\Models\RefreshRun;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -27,7 +28,7 @@ class InterfaceTest extends TestCase
         $this->post(route('profiles.refresh', $this->profile))->assertRedirect();
 
         $run = RefreshRun::sole();
-        $this->assertSame(RefreshRun::STATUS_QUEUED, $run->status);
+        $this->assertSame(RunStatus::Queued, $run->status);
         $this->assertSame('ui', $run->trigger);
         // No HTTP happened in the request: no attempt was recorded.
         $this->assertSame(0, $run->requests_used);

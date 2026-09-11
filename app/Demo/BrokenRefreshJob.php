@@ -2,6 +2,7 @@
 
 namespace App\Demo;
 
+use App\Enums\RunStatus;
 use App\Models\Profile;
 use App\Models\RefreshRun;
 use App\Refresh\Clients\ClientFactory;
@@ -27,7 +28,9 @@ class BrokenRefreshJob implements ShouldQueue
 
     public function handle(ClientFactory $clients): void
     {
-        abort_unless(app()->environment(['local', 'testing']), 500, 'broken handler is demo only');
+        if (! app()->environment(['local', 'testing'])) {
+            throw new \RuntimeException('the broken handler is demo only and never runs outside local/testing');
+        }
 
         $run = RefreshRun::query()->with('profile.account')->find($this->runId);
         if ($run === null) {
@@ -49,7 +52,7 @@ class BrokenRefreshJob implements ShouldQueue
         ]);
 
         $run->forceFill([
-            'status' => RefreshRun::STATUS_SUCCEEDED,
+            'status' => RunStatus::Succeeded,
             'outcome_category' => 'broken_false_success',
             'outcome_message' => 'HTTP '.($result->status ?? 'none').' treated as success',
             'requests_used' => 1,

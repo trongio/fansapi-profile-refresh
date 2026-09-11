@@ -1,6 +1,6 @@
 {
     "mode": "broken",
-    "generated_at": "2026-09-11T16:42:37+00:00",
+    "generated_at": "2026-09-11T17:19:13+00:00",
     "capacity": {
         "workers": 2,
         "layout": "two workers sharing one FIFO queue"
@@ -18,7 +18,7 @@
             10
         ]
     },
-    "elapsed_seconds": 13.31,
+    "elapsed_seconds": 13.3,
     "accounts": {
         "A": {
             "queue": "refresh-a",
@@ -29,7 +29,7 @@
             "attempts_per_valid_refresh": null,
             "retries_scheduled": 0,
             "dead_letters": 0,
-            "peak_oldest_waiting_seconds": 12,
+            "peak_oldest_waiting_seconds": 11,
             "final_oldest_waiting_seconds": null,
             "final_queue_depth": {
                 "ready": 0,
@@ -49,7 +49,7 @@
             "attempts_per_valid_refresh": null,
             "retries_scheduled": 0,
             "dead_letters": 0,
-            "peak_oldest_waiting_seconds": 11,
+            "peak_oldest_waiting_seconds": 10,
             "final_oldest_waiting_seconds": null,
             "final_queue_depth": {
                 "ready": 0,
@@ -67,7 +67,7 @@
             "username": "a-01",
             "likes": 0,
             "revision": 9,
-            "last_success_at": "2026-09-11T16:42:26+00:00",
+            "last_success_at": "2026-09-11T17:19:02+00:00",
             "last_failure_category": null,
             "success_count": 1,
             "pending": false
@@ -77,7 +77,7 @@
             "username": "a-02",
             "likes": 0,
             "revision": 9,
-            "last_success_at": "2026-09-11T16:42:26+00:00",
+            "last_success_at": "2026-09-11T17:19:02+00:00",
             "last_failure_category": null,
             "success_count": 1,
             "pending": false
@@ -87,7 +87,7 @@
             "username": "a-03",
             "likes": 0,
             "revision": 9,
-            "last_success_at": "2026-09-11T16:42:28+00:00",
+            "last_success_at": "2026-09-11T17:19:04+00:00",
             "last_failure_category": null,
             "success_count": 1,
             "pending": false
@@ -97,7 +97,7 @@
             "username": "a-04",
             "likes": 0,
             "revision": 9,
-            "last_success_at": "2026-09-11T16:42:28+00:00",
+            "last_success_at": "2026-09-11T17:19:04+00:00",
             "last_failure_category": null,
             "success_count": 1,
             "pending": false
@@ -107,7 +107,7 @@
             "username": "a-05",
             "likes": 0,
             "revision": 9,
-            "last_success_at": "2026-09-11T16:42:30+00:00",
+            "last_success_at": "2026-09-11T17:19:06+00:00",
             "last_failure_category": null,
             "success_count": 1,
             "pending": false
@@ -117,7 +117,7 @@
             "username": "a-06",
             "likes": 0,
             "revision": 9,
-            "last_success_at": "2026-09-11T16:42:30+00:00",
+            "last_success_at": "2026-09-11T17:19:06+00:00",
             "last_failure_category": null,
             "success_count": 1,
             "pending": false
@@ -127,7 +127,7 @@
             "username": "a-07",
             "likes": 0,
             "revision": 9,
-            "last_success_at": "2026-09-11T16:42:32+00:00",
+            "last_success_at": "2026-09-11T17:19:08+00:00",
             "last_failure_category": null,
             "success_count": 1,
             "pending": false
@@ -137,7 +137,7 @@
             "username": "a-08",
             "likes": 0,
             "revision": 9,
-            "last_success_at": "2026-09-11T16:42:32+00:00",
+            "last_success_at": "2026-09-11T17:19:08+00:00",
             "last_failure_category": null,
             "success_count": 1,
             "pending": false
@@ -147,7 +147,7 @@
             "username": "a-09",
             "likes": 0,
             "revision": 9,
-            "last_success_at": "2026-09-11T16:42:34+00:00",
+            "last_success_at": "2026-09-11T17:19:10+00:00",
             "last_failure_category": null,
             "success_count": 1,
             "pending": false
@@ -157,7 +157,7 @@
             "username": "a-10",
             "likes": 0,
             "revision": 9,
-            "last_success_at": "2026-09-11T16:42:34+00:00",
+            "last_success_at": "2026-09-11T17:19:10+00:00",
             "last_failure_category": null,
             "success_count": 1,
             "pending": false
@@ -167,7 +167,7 @@
             "username": "a-11",
             "likes": 0,
             "revision": 9,
-            "last_success_at": "2026-09-11T16:42:36+00:00",
+            "last_success_at": "2026-09-11T17:19:12+00:00",
             "last_failure_category": null,
             "success_count": 1,
             "pending": false
@@ -177,7 +177,7 @@
             "username": "a-12",
             "likes": 0,
             "revision": 9,
-            "last_success_at": "2026-09-11T16:42:36+00:00",
+            "last_success_at": "2026-09-11T17:19:12+00:00",
             "last_failure_category": null,
             "success_count": 1,
             "pending": false
@@ -187,7 +187,7 @@
             "username": "b-01",
             "likes": 120500,
             "revision": 9,
-            "last_success_at": "2026-09-11T16:42:36+00:00",
+            "last_success_at": "2026-09-11T17:19:12+00:00",
             "last_failure_category": null,
             "success_count": 1,
             "pending": false
@@ -197,7 +197,7 @@
             "username": "b-02",
             "likes": 120500,
             "revision": 9,
-            "last_success_at": "2026-09-11T16:42:36+00:00",
+            "last_success_at": "2026-09-11T17:19:12+00:00",
             "last_failure_category": null,
             "success_count": 1,
             "pending": false
@@ -207,7 +207,7 @@
             "username": "b-03",
             "likes": 120500,
             "revision": 9,
-            "last_success_at": "2026-09-11T16:42:37+00:00",
+            "last_success_at": "2026-09-11T17:19:12+00:00",
             "last_failure_category": null,
             "success_count": 1,
             "pending": false
@@ -217,7 +217,7 @@
             "username": "b-04",
             "likes": 120500,
             "revision": 9,
-            "last_success_at": "2026-09-11T16:42:37+00:00",
+            "last_success_at": "2026-09-11T17:19:12+00:00",
             "last_failure_category": null,
             "success_count": 1,
             "pending": false
@@ -281,7 +281,7 @@
                 "delayed": 0,
                 "reserved": 0,
                 "valid_refreshes": 0,
-                "oldest_waiting_seconds": 1
+                "oldest_waiting_seconds": 0
             },
             "B": {
                 "ready": 0,
@@ -298,7 +298,7 @@
                 "delayed": 0,
                 "reserved": 0,
                 "valid_refreshes": 0,
-                "oldest_waiting_seconds": 2
+                "oldest_waiting_seconds": 1
             },
             "B": {
                 "ready": 0,
@@ -315,7 +315,7 @@
                 "delayed": 0,
                 "reserved": 0,
                 "valid_refreshes": 0,
-                "oldest_waiting_seconds": 3
+                "oldest_waiting_seconds": 2
             },
             "B": {
                 "ready": 0,
@@ -332,7 +332,7 @@
                 "delayed": 0,
                 "reserved": 0,
                 "valid_refreshes": 0,
-                "oldest_waiting_seconds": 4
+                "oldest_waiting_seconds": 3
             },
             "B": {
                 "ready": 0,
@@ -349,7 +349,7 @@
                 "delayed": 0,
                 "reserved": 0,
                 "valid_refreshes": 0,
-                "oldest_waiting_seconds": 5
+                "oldest_waiting_seconds": 4
             },
             "B": {
                 "ready": 0,
@@ -360,13 +360,13 @@
             }
         },
         {
-            "t": 5.3,
+            "t": 5.2,
             "A": {
                 "ready": 0,
                 "delayed": 0,
                 "reserved": 0,
                 "valid_refreshes": 0,
-                "oldest_waiting_seconds": 6
+                "oldest_waiting_seconds": 5
             },
             "B": {
                 "ready": 0,
@@ -383,7 +383,7 @@
                 "delayed": 0,
                 "reserved": 0,
                 "valid_refreshes": 0,
-                "oldest_waiting_seconds": 7
+                "oldest_waiting_seconds": 6
             },
             "B": {
                 "ready": 0,
@@ -400,7 +400,7 @@
                 "delayed": 0,
                 "reserved": 0,
                 "valid_refreshes": 0,
-                "oldest_waiting_seconds": 8
+                "oldest_waiting_seconds": 7
             },
             "B": {
                 "ready": 0,
@@ -417,7 +417,7 @@
                 "delayed": 0,
                 "reserved": 0,
                 "valid_refreshes": 0,
-                "oldest_waiting_seconds": 9
+                "oldest_waiting_seconds": 8
             },
             "B": {
                 "ready": 0,
@@ -485,14 +485,14 @@
                 "delayed": 0,
                 "reserved": 0,
                 "valid_refreshes": 0,
-                "oldest_waiting_seconds": 12
+                "oldest_waiting_seconds": null
             },
             "B": {
                 "ready": 0,
                 "delayed": 0,
                 "reserved": 0,
                 "valid_refreshes": 0,
-                "oldest_waiting_seconds": 11
+                "oldest_waiting_seconds": 5
             }
         },
         {

@@ -45,7 +45,7 @@ Every requested behaviour, and where to verify it.
 | `verified_unchanged` recorded once, separate from a data update | `DataProtectionTest`, `profiles.verified_unchanged_count` |
 | Late run cannot clear a newer pending pointer | `DataProtectionTest::a_late_run_cannot_clear_a_newer_runs_pending_pointer` |
 | 24h above 100000, 72h at or below, exactly 100000 tested | `ProfileWriter::nextRefreshAt()`, `DataProtectionTest` |
-| Bounded indexed due-selection | `Profile::scopeDue()`, `profiles_due_idx`, `SchedulingTest` |
+| Bounded indexed due-selection | `Profile::due()` scope, `profiles_due_idx`, `fans:dispatch-due`, `SchedulingTest` |
 | Repeated/concurrent scheduling creates no duplicate work | `SchedulingTest::repeated_scheduling_does_not_create_work_that_is_already_pending` |
 | Terminal failure not rescheduled every minute | `SchedulingTest::an_unresolved_terminal_failure_is_not_rescheduled_every_minute` |
 | Abandoned claim recovered under the same run id | `SchedulingTest::an_abandoned_claim_is_recovered_under_the_same_logical_run_id` |
@@ -71,12 +71,12 @@ Every requested behaviour, and where to verify it.
 
 | Requirement | Where |
 | --- | --- |
-| Laravel `failed_jobs` used as the DLQ, linked to the run | `DeadLetters::record()`, `refresh_runs.failed_job_uuid` |
+| Laravel `failed_jobs` used as the DLQ, linked to the run | `Listeners\LinkDeadLetterToRun`, `DeadLetters::record()`, `refresh_runs.failed_job_uuid` |
 | Paginated CLI and UI inspection | `fans:demo dlq`, `/dead-letters` |
 | Terminal failure preserves data and reconciles pending state | `DeadLetterReplayTest::an_exhausted_run_becomes_a_dead_letter_with_the_data_preserved` |
 | Replay is bounded and goes through the normal path | `DeadLetters::replay()` |
 | Concurrent replay creates no duplicate work | `DeadLetterReplayTest::a_repeated_replay_request_does_not_create_duplicate_active_work` |
-| Original failure preserved, resolved only when the replay finishes | `refresh_runs.resolved_at`, `DeadLetters::markResolved()` |
+| Original failure preserved, resolved only when the replay finishes | `refresh_runs.resolved_at`, `RefreshRun::resolveReplayedOriginal()` |
 | Full cycle demonstrated | `evidence/dlq-demo.txt` |
 
 ## Memory
@@ -115,7 +115,7 @@ Every requested behaviour, and where to verify it.
 | Activity panel, profile list/detail, queued refresh, DLQ with replay | `resources/views/` |
 | LIVE vs FIXTURE label | `resources/views/layouts/app.blade.php` |
 | Escaped output, POST plus CSRF, backend deduplication, local only | `InterfaceTest`, `app/Http/Middleware/EnsureLocalDemo.php` |
-| Web actions enqueue only | `InterfaceTest::the_refresh_action_only_enqueues_and_never_calls_the_upstream` |
+| Web actions enqueue only | `InterfaceTest::the_refresh_action_only_enqueues_and_never_calls_the_upstream`, `evidence/browser-run.txt` |
 | Horizon as the operational view, jobs tagged | `RefreshProfileJob::tags()` |
 | ~3s bounded polling with an updated-at indicator | `resources/views/partials/activity.blade.php` |
 | Last valid likes visible while retrying | `resources/views/profiles/index.blade.php` |

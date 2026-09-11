@@ -1,5 +1,5 @@
 $ dc php artisan fans:demo workload --mode=broken --wait=180 --json=evidence/workload-broken.json
-started: 2026-09-11T16:42:22Z
+started: 2026-09-11T17:18:59Z
 ----------------------------------------------------------------
   mode=broken: resetting demo data
   fixture scenario pushed; scenario clock started
@@ -13,10 +13,10 @@ started: 2026-09-11T16:42:22Z
 +---------+------+-----------------+-----------------+---------------+--------------------+---------+------+----------------------+-----------------------+
 | account | runs | valid refreshes | false successes | upstream reqs | reqs/valid refresh | retries | dead | peak oldest wait (s) | final oldest wait (s) |
 +---------+------+-----------------+-----------------+---------------+--------------------+---------+------+----------------------+-----------------------+
-| A       | 12   | 0               | 12              | 12            | undefined          | 0       | 0    | 12                   | -                     |
-| B       | 4    | 0               | 4               | 4             | undefined          | 0       | 0    | 11                   | -                     |
+| A       | 12   | 0               | 12              | 12            | undefined          | 0       | 0    | 11                   | -                     |
+| B       | 4    | 0               | 4               | 4             | undefined          | 0       | 0    | 10                   | -                     |
 +---------+------+-----------------+-----------------+---------------+--------------------+---------+------+----------------------+-----------------------+
 wrote evidence/workload-broken.json
 ----------------------------------------------------------------
 exit status: 0
-elapsed: 15s
+elapsed: 14s

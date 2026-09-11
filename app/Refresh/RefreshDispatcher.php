@@ -2,6 +2,7 @@
 
 namespace App\Refresh;
 
+use App\Enums\RunStatus;
 use App\Jobs\RefreshProfileJob;
 use App\Models\Profile;
 use App\Models\RefreshRun;
@@ -21,7 +22,10 @@ use Illuminate\Support\Str;
  */
 class RefreshDispatcher
 {
-    public function __construct(private readonly RefreshLogger $log) {}
+    public function __construct(
+        private readonly RefreshLogger $log,
+        private readonly RunRecorder $recorder,
+    ) {}
 
     /** Returns the new run, or null when the profile already has pending work. */
     public function enqueue(Profile $profile, string $trigger = 'schedule', ?RefreshRun $replayOf = null): ?RefreshRun
@@ -38,7 +42,7 @@ class RefreshDispatcher
             $run = RefreshRun::create([
                 'profile_id' => $locked->id,
                 'account_id' => $locked->account_id,
-                'status' => RefreshRun::STATUS_QUEUED,
+                'status' => RunStatus::Queued,
                 'trigger' => $trigger,
                 'enqueued_at' => $now,
                 'deadline_at' => $now->copy()->addMinutes((int) config('fansapi.refresh.deadline_minutes')),
@@ -92,14 +96,14 @@ class RefreshDispatcher
 
         RefreshRun::query()
             ->with('account')
-            ->whereIn('status', [RefreshRun::STATUS_QUEUED, RefreshRun::STATUS_RUNNING])
+            ->whereIn('status', RunStatus::active())
             ->where('updated_at', '<=', $now->copy()->subSeconds($grace))
             ->where(fn ($q) => $q->whereNull('available_at')->orWhere('available_at', '<=', $now))
             ->orderBy('id')
             ->limit((int) config('fansapi.refresh.batch_size'))
             ->each(function (RefreshRun $run) use ($now, &$redispatched, &$expired): void {
                 if ($run->deadline_at->lte($now)) {
-                    app(RunRecorder::class)->failTerminally($run, Outcome::DEADLINE_EXCEEDED, 'logical deadline exceeded');
+                    $this->recorder->failTerminally($run, Outcome::DEADLINE_EXCEEDED, 'logical deadline exceeded');
                     $expired++;
 
                     return;

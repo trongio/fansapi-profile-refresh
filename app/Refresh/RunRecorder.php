@@ -2,6 +2,7 @@
 
 namespace App\Refresh;
 
+use App\Enums\RunStatus;
 use App\Models\Profile;
 use App\Models\RefreshAttempt;
 use App\Models\RefreshRun;
@@ -41,7 +42,7 @@ class RunRecorder
      * Terminal failure: the run stops, the profile keeps every accepted value,
      * and the pending pointer is reconciled - but only if it still points here.
      */
-    public function failTerminally(RefreshRun $run, string $category, string $message, string $status = RefreshRun::STATUS_FAILED): void
+    public function failTerminally(RefreshRun $run, string $category, string $message, RunStatus $status = RunStatus::Failed): void
     {
         $now = Carbon::now();
 
@@ -68,11 +69,11 @@ class RunRecorder
                 ->update(['pending_run_id' => null]);
         }
 
-        app(DeadLetters::class)->markResolved($run);
+        $run->resolveReplayedOriginal();
 
-        $this->log->event($status === RefreshRun::STATUS_DEAD_LETTERED ? 'dead_lettered' : 'request_failed', $run, [
+        $this->log->event($status === RunStatus::DeadLettered ? 'dead_lettered' : 'request_failed', $run, [
             'category' => $category,
-            'outcome' => $status,
+            'outcome' => $status->value,
         ]);
     }
 }
