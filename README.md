@@ -379,8 +379,21 @@ is not a scaling answer.
 
 ## Time spent and what is not done
 
-Roughly 3.5 hours of machine-assisted work end to end, including setup,
-the live verification, debugging and the write-up.
+Wall-clock, taken from file and commit timestamps on this machine. The work was
+done with an AI coding agent driving the shell, which is why the phases are
+short; what is not in the table is the research and prompt preparation done
+before this session, which was not timed.
+
+| Phase | Time | What happened |
+| --- | --- | --- |
+| Live probe, scaffold, Docker image, Compose | 15 min | `curl` of the provider first, Laravel 13 skeleton, PHP 8.4 image, dependency resolution |
+| Core pipeline | 30 min | migrations, models, client, normalizer, writer, dispatcher, job, fixture server, demo commands |
+| Bring-up and first runs | 15 min | stack up, broken and fixed reproductions, both workload modes, two real defects fixed |
+| Tests | 20 min | 59 tests across seven files, including the two-process race |
+| Dead letters, memory scenario, live run, evidence | 20 min | DLQ replay path, memory probe, `fans:demo live`, `capture-evidence.sh` |
+| Documentation and clean-setup check | 15 min | README, call guide, AI.md, requirements map, teardown and rebuild from empty volumes |
+| Review pass | 30 min | enum, factories, listeners, scheduled commands, Pint, Playwright run, direct-route probe, evidence regenerated |
+| **Total** | **about 2 h 25 min** | first command to last push |
 
 Not done, deliberately: no REST API, no SPA, no media downloads, no external
 search service, no production infrastructure, no direct OnlyFans adapter. Not
