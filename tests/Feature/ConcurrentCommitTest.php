@@ -7,6 +7,7 @@ use App\Models\RefreshRun;
 use App\Refresh\NormalizedProfile;
 use App\Refresh\Outcome;
 use App\Refresh\ProfileWriter;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
@@ -30,6 +31,11 @@ class ConcurrentCommitTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // This class does not use RefreshDatabase, so on a brand-new test
+        // database nothing has migrated yet when it runs first.
+        Artisan::call('migrate', ['--force' => true]);
+
         $this->truncateDemoTables();
     }
 

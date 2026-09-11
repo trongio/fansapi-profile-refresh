@@ -51,7 +51,23 @@ These were real defects found by running the thing, not hypotheticals:
    256 KiB while the README described a single 1 MiB limit, so valid 900 KB
    responses in the memory scenario failed. Fix: one documented limit, enforced
    on the wire.
-6. **A long-lived worker kept running old code.** A memory run was measured
+6. **Helper containers wrote root-owned files into the bind mount.** The
+   Composer and Node steps ran as root, so `vendor`, `node_modules`,
+   `package-lock.json` and compiled views became undeletable from the host and
+   a clean rebuild failed with `EACCES`. Found by actually tearing the stack
+   down and bringing it back up. Fix: every service runs as the host uid:gid
+   (`DOCKER_USER` in `.env`).
+7. **The concurrency test failed on a brand-new test database.** It does not
+   use `RefreshDatabase`, so nothing had migrated when it ran first in the
+   suite. It passed in isolation and on a warm database, which is exactly the
+   kind of failure a reviewer hits on first run. Fix: it migrates in `setUp`.
+8. **Horizon's baseline supervisor ran one worker, not two.** With balancing
+   off, Horizon starts `floor((minProcesses + maxProcesses) / 2)` workers, so
+   `maxProcesses: 2` alone gave one. The broken-mode comparison would have
+   quietly used half the capacity it claimed. Found by counting the actual
+   processes in the container rather than trusting the config. Fix: both bounds
+   are pinned, and the workload evidence was regenerated.
+9. **A long-lived worker kept running old code.** A memory run was measured
    against a stale worker and produced numbers that contradicted the code.
    Fix: the evidence script runs `horizon:terminate` before measuring.
 

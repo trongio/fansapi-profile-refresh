@@ -29,3 +29,6 @@ Thumbs.db
 # Project-specific
 /storage/fixture
 /storage/logs/memory-samples.jsonl
+
+# Submission archive
+/*.zip
