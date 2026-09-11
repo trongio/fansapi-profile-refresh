@@ -183,8 +183,9 @@ replay is a domain action, not `queue:retry`, so the record is not deleted.
 **Why is memory low?**
 Small jobs carrying one integer, a 1 MiB cap enforced while the body arrives,
 a single decode, batched queries limited to scheduling columns, and no browser
-or media pipeline. Measured: PHP peak 18 MiB, worker RSS flat at 73.1 MiB
-across 120 jobs with no measurable drift.
+or media pipeline. Measured: PHP peak 18 MiB, worker RSS flat at 72.5 MiB
+across 119 jobs on a second pass over ~880 KB stored snapshots, with no
+measurable drift.
 
 **What fails first at scale?**
 Upstream quota, then network-bound worker capacity, then SQL write and history
