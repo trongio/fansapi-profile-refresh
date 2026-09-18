@@ -47,12 +47,12 @@ Jobs are tagged `run:<id>`, so a single refresh can be found under *Monitoring*.
 > late cannot overwrite a newer one.
 >
 > On retrieval: I implemented the OnlyFans request signing myself, the way the
-> web client does it, no browser and no account. As of today a signed anonymous
-> request still gets a 400 asking to refresh the page, because OnlyFans issues
-> the session on a real page load with a JS challenge, which is the browser
-> dependency I was avoiding for memory. So the direct adapter reports that
-> cleanly and preserves the last good data, and the managed provider is the
-> fallback that returns data. Everything else is measured locally against a
+> web client does it, no browser and no account. A signed anonymous request
+> currently gets a 400 asking to refresh the page. I diffed it against a
+> logged-out browser request that works: it is not a browser wall, the signing
+> rules rotated with a new web build and the public copy had not caught up. So
+> the direct adapter reports that cleanly and preserves the last good data, and
+> the managed provider is the fallback that returns data. Everything else is measured locally against a
 > fixture upstream in its own container.
 
 ## Five-minute demo
@@ -145,6 +145,60 @@ The request path is: **UI, CLI or scheduler → `RefreshDispatcher` → Redis �
 | `tests/Feature/DataProtectionTest.php` | Uniqueness, revision ordering, replay after commit, and the 100000 boundary. |
 | `tests/Feature/ConcurrentCommitTest.php` | The same ordering rule under real two-process contention. |
 
+## The direct route: last mile without the fallback
+
+This is the topic they asked for. Lead with the finding, then the options,
+then ask them the question only they can answer.
+
+**What I found (two sentences).**
+I compared our signed request with a logged-out browser request that returns
+200. Cloudflare only challenges the HTML homepage, the anonymous `sess` cookie
+comes without a page load, and the difference is the signing rules: the
+browser signs with prefix `65335`, the public rules still have `26974`, because
+OnlyFans shipped a new web build two days earlier. It also sends `x-of-rev`
+and `x-hash`, which we do not.
+
+**Correct what the submission said.**
+"My write-up said a JS challenge was the wall. That was an inference, and when
+I tested it properly it was wrong. The real dependency is the rule rotation."
+Saying this first is better than being caught on it.
+
+**What finishing it actually means.**
+1. Detect a new build: `x-of-rev` changes, or `signature_rejected` climbs
+   above a threshold. The adapter already drops cached rules on rejection.
+2. Get current rules: derive them from the current client bundle ourselves,
+   rather than waiting on a community repo that lags by days.
+3. Produce `x-hash` and a consistent `fp`/`x-bc` pair the way the page does.
+4. Keep the provider behind the same interface as the fallback while rules
+   are stale, so data keeps flowing during every rotation.
+
+Nothing downstream changes: the normalizer already accepts the unwrapped
+direct shape, and writes, revisions and memory do not care which adapter ran.
+
+**The honest trade-off.**
+Steps 2 and 3 are not a one-off fix. OnlyFans rotates on purpose, so owning
+this is a standing maintenance cost, someone on call for every web release,
+and it is deliberately working around their anti-automation. The provider's
+price is roughly the price of not doing that. The cost side is ours to
+estimate; the policy side is theirs.
+
+**Question to ask them.**
+"Is owning the rotation something you want in-house, and are you comfortable
+with that from a terms-of-service point of view? If yes, I would build it as
+a rules service with rotation detection and alerting, and keep the provider as
+a circuit-breaker fallback, not remove it."
+
+**If they push: 'can you do it without the fallback at all?'**
+Yes, technically, as long as rule updates ship faster than rotations. But
+dropping the fallback turns every rotation into an outage for the length of
+the rules update. I would keep it and measure how often it fires; if that is
+near zero, removing it is then an easy, data-backed decision.
+
+**Don'ts.** No live demo of the direct route (it returns 400 today). Don't
+claim it "almost works". Don't say you would put a headless browser in the
+worker path; the diagnosis showed it is not needed and it breaks the memory
+budget.
+
 ## Likely questions
 
 **Why did it break with no deployment of ours?**
@@ -232,5 +286,8 @@ problems show a growing oldest-waiting age with a normal outcome mix.
 - The crash test covers redelivery after a database commit. It does not cover
   OS-level kills, reservation expiry, or partial writes.
 - Two workers on one machine. Nothing here demonstrates production scale.
+- The direct adapter returns 400 until its signing rules match the current web
+  build. The diagnosis is in `evidence/direct-route-diagnosis.md`; tracking the
+  rotation in-house was deliberately not built.
 - If anything live fails during the call, use `evidence/`; every number quoted
   above is in there with its command and exit status.

@@ -69,12 +69,35 @@ As of this submission, a correctly signed **anonymous** request still returns:
 HTTP 400  {"error":{"code":401,"message":"Please refresh the page"}}
 ```
 
-OnlyFans now gates the public profile endpoint behind a session it hands out
-only on a real page load with a JS challenge, which is exactly the browser
-dependency the low-memory design avoids. The adapter treats this as a first
-class outcome (`signature_rejected`): the run is dead-lettered, **the last
-valid data is preserved**, and it is replayable once the rules or the session
-path are updated. It is not a crash and it never writes bad data.
+**Diagnosis (follow-up probe, `evidence/direct-route-diagnosis.md`).** The
+submission originally blamed a JS challenge on page load. That was wrong, and
+the probe shows what actually fails:
+
+- The API path is not behind the Cloudflare challenge. Only the HTML homepage
+  is. Signed calls to `/api2/v2/...` reach the OnlyFans application, which
+  answers in JSON.
+- The anonymous session is not the blocker. The first signed call is handed a
+  `sess` cookie with no page load. Replaying with that cookie still returns 400.
+- The signing rules are stale. A logged-out browser request that returns 200
+  signs with prefix `65335` and suffix `6aac0d65`. The community rules the
+  adapter fetches still carry `26974` and `669fb034`. The web build had rotated
+  two days earlier (`x-of-rev: 202609171554-...`) and the published rules had
+  not caught up.
+- The browser also sends `x-of-rev` and `x-hash`, and uses its `fp` cookie as
+  `x-bc`. The adapter sends none of that.
+
+So the last mile is not a browser. It is **owning rule rotation**: detect a new
+web build, derive the rules and the `x-hash` from the current client bundle,
+and swap them in before the old ones stop working. That is a standing
+commitment to track a deliberately changing anti-automation scheme, which is
+exactly the work the managed provider is paid to do. Whether to take that on
+in-house is a product and policy decision rather than a missing line of code,
+so it was not built here.
+
+Until then the adapter treats the rejection as a first class outcome
+(`signature_rejected`): it drops the cached rules, the run is dead-lettered,
+**the last valid data is preserved**, and it is replayable once current rules
+are available. It is not a crash and it never writes bad data.
 
 ### Managed provider, the fallback (`fans:demo live --source=ofapi`)
 
@@ -98,8 +121,8 @@ HTTP 200
 Both adapters map to the same `NormalizedProfile`; the direct one returns the
 profile object unwrapped, the provider wraps it in `data`. Nothing downstream,
 validation, revision safety, queues, isolation, memory, depends on which route
-produced the JSON. That is the point of the interface: when the direct session
-step is solved, it becomes the working default with no other change.
+produced the JSON. That is the point of the interface: once current signing
+rules are supplied, it becomes the working default with no other change.
 
 **`favoritedCount` versus `favoritesCount`.** The first is ~605,800 and the
 second is 16 for this profile, which is only consistent with the first being
@@ -422,7 +445,8 @@ before this session, which was not timed.
 | **Total** | **about 2 h 25 min** | first command to last push |
 
 Not done, deliberately: no REST API, no SPA, no media downloads, no external
-search service, no production infrastructure, no direct OnlyFans adapter. Not
+search service, no production infrastructure, no in-house tracking of the
+OnlyFans signing-rule rotation (the direct adapter exists, see above). Not
 proven: the provider's own failure modes under real load, crash semantics
 beyond the commit boundary, and anything about scale beyond this one machine.
 `AI.md` lists what remains unverified.

@@ -122,14 +122,18 @@ browser and no account.
 
 What it actually returns, verified on this machine: `HTTP 400
 {"error":{"code":401,"message":"Please refresh the page"}}`. A signed request
-is not enough; OnlyFans gates the endpoint behind a session issued on a real
-page load with a JS challenge, which is the browser dependency the low-memory
-design deliberately avoids. The adapter surfaces this as `signature_rejected`,
-dead-letters the run and preserves the last valid data, rather than crashing or
-writing zero. The managed provider remains the fallback that returns data. This
-is disclosed rather than dressed up as working: the signing is real and tested,
-the anonymous session step is not solved, and the interface means solving it
-later changes nothing else.
+is not enough. The first write-up blamed a session issued on a page load with a
+JS challenge; a later probe (`evidence/direct-route-diagnosis.md`) showed that
+was wrong. The API path is not challenged, an anonymous `sess` cookie is issued
+without a page load, and a logged-out browser request that succeeds is signed
+with a different prefix and suffix than the community-published rules. The
+rules were stale after a web build rotation, and the browser also sends
+`x-of-rev` and `x-hash`. The adapter surfaces the rejection as
+`signature_rejected`, drops the cached rules, dead-letters the run and
+preserves the last valid data. The managed provider remains the fallback that
+returns data. Deriving current rules and `x-hash` from the client bundle was
+deliberately not built: it means tracking a changing anti-automation scheme on
+an ongoing basis, which is a product decision, not a code gap.
 
 ## What remains unverified
 

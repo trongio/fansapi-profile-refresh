@@ -15,10 +15,11 @@ use App\Refresh\Outcome;
  * "data"); the normalizer handles source "onlyfans" accordingly.
  *
  * Status today: OnlyFans answers a signed anonymous request with HTTP 400 and
- * {"error":{"code":401,"message":"Please refresh the page"}} unless the request
- * also carries the session identifiers the site hands a real page load. That
- * outcome is surfaced as SIGNATURE_REJECTED rather than crashing, and the
- * managed provider adapter is the fallback that returns data today.
+ * {"error":{"code":401,"message":"Please refresh the page"}} when the signing
+ * rules lag the current web build (the browser also sends x-of-rev and x-hash).
+ * See evidence/direct-route-diagnosis.md. That outcome is surfaced as
+ * SIGNATURE_REJECTED rather than crashing, and the managed provider adapter is
+ * the fallback that returns data today.
  */
 class OnlyfansDirectClient extends BoundedHttpClient implements ProfileClient
 {
