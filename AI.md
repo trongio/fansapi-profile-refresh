@@ -132,8 +132,8 @@ rules were stale after a web build rotation, and the browser also sends
 `signature_rejected`, drops the cached rules, dead-letters the run and
 preserves the last valid data. The managed provider remains the fallback that
 returns data. Deriving current rules and `x-hash` from the client bundle was
-deliberately not built: it means tracking a changing anti-automation scheme on
-an ongoing basis, which is a product decision, not a code gap.
+not built: it is ongoing work that follows every OnlyFans release and needs a
+proper design, which is sketched in `CALL_GUIDE.md` instead.
 
 ## What remains unverified
 

@@ -88,11 +88,12 @@ the probe shows what actually fails:
 
 So the last mile is not a browser. It is **owning rule rotation**: detect a new
 web build, derive the rules and the `x-hash` from the current client bundle,
-and swap them in before the old ones stop working. That is a standing
-commitment to track a deliberately changing anti-automation scheme, which is
-exactly the work the managed provider is paid to do. Whether to take that on
-in-house is a product and policy decision rather than a missing line of code,
-so it was not built here.
+and swap them in before the old ones stop working. That is ongoing work that
+follows every OnlyFans release, so it deserves a proper design (rotation
+detection, a canary check, rules versioned by `x-of-rev`) rather than a rushed
+script in a take-home. The design is sketched in `CALL_GUIDE.md`; it was not
+built here. The static script server answers plain HTTP (see the evidence), so
+the rules job does not need a browser to download the client code.
 
 Until then the adapter treats the rejection as a first class outcome
 (`signature_rejected`): it drops the cached rules, the run is dead-lettered,
@@ -445,7 +446,7 @@ before this session, which was not timed.
 | **Total** | **about 2 h 25 min** | first command to last push |
 
 Not done, deliberately: no REST API, no SPA, no media downloads, no external
-search service, no production infrastructure, no in-house tracking of the
+search service, no production infrastructure, no automated tracking of the
 OnlyFans signing-rule rotation (the direct adapter exists, see above). Not
 proven: the provider's own failure modes under real load, crash semantics
 beyond the commit boundary, and anything about scale beyond this one machine.

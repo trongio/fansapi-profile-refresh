@@ -147,8 +147,8 @@ The request path is: **UI, CLI or scheduler → `RefreshDispatcher` → Redis �
 
 ## The direct route: last mile without the fallback
 
-This is the topic they asked for. Lead with the finding, then the options,
-then ask them the question only they can answer.
+This is the topic they asked for. Lead with the finding, then the plan, then
+how it survives a rotation with no fallback, then ask how they handle it.
 
 **What I found (two sentences).**
 I compared our signed request with a logged-out browser request that returns
@@ -167,37 +167,41 @@ Saying this first is better than being caught on it.
 1. Detect a new build: `x-of-rev` changes, or `signature_rejected` climbs
    above a threshold. The adapter already drops cached rules on rejection.
 2. Get current rules: derive them from the current client bundle ourselves,
-   rather than waiting on a community repo that lags by days.
+   rather than waiting on a community repo that lags by days. The bundle lives
+   under `static2.onlyfans.com/static/prod/f/<x-of-rev>/` and downloads with
+   plain HTTP, no cookies. Extract by running the signing function in a
+   sandbox rather than pattern matching, so obfuscation changes matter less.
 3. Produce `x-hash` and a consistent `fp`/`x-bc` pair the way the page does.
-4. Keep the provider behind the same interface as the fallback while rules
-   are stale, so data keeps flowing during every rotation.
+   Not worked out yet; say so.
+4. Verify before publishing: sign one request for a known public profile and
+   accept the rules only on a 200. Store them in Redis keyed by `x-of-rev`;
+   workers pick them up with no deploy.
+5. Canary: that same check every few minutes, so a rotation is noticed before
+   real jobs fail.
 
 Nothing downstream changes: the normalizer already accepts the unwrapped
 direct shape, and writes, revisions and memory do not care which adapter ran.
 
-**The honest trade-off.**
-Steps 2 and 3 are not a one-off fix. OnlyFans rotates on purpose, so owning
-this is a standing maintenance cost, someone on call for every web release,
-and it is deliberately working around their anti-automation. The provider's
-price is roughly the price of not doing that. The cost side is ours to
-estimate; the policy side is theirs.
+**Without the fallback.**
+There is nothing to switch to, so a rotation must not lose data:
+retry once with freshly fetched rules; hold `signature_rejected` runs in the
+dead-letter queue; keep serving the last good snapshot, marked with when it was
+last refreshed; replay the held runs once the new rules pass the check. The
+number to watch is time from rotation to recovery, plus rejections per rules
+version. All of the hold, preserve and replay machinery already exists.
+
+**Where a browser is and is not acceptable.**
+Never in the workers: that is where memory matters. At most once per release in
+the rules job, and only if discovering the current build and file names turns
+out to need a page load, since the homepage is behind Cloudflare.
 
 **Question to ask them.**
-"Is owning the rotation something you want in-house, and are you comfortable
-with that from a terms-of-service point of view? If yes, I would build it as
-a rules service with rotation detection and alerting, and keep the provider as
-a circuit-breaker fallback, not remove it."
-
-**If they push: 'can you do it without the fallback at all?'**
-Yes, technically, as long as rule updates ship faster than rotations. But
-dropping the fallback turns every rotation into an outage for the length of
-the rules update. I would keep it and measure how often it fires; if that is
-near zero, removing it is then an easy, data-backed decision.
+"How quickly do you usually need to react when OnlyFans ships a new build, and
+what breaks most often for you: the rules, `x-hash`, or sessions?"
 
 **Don'ts.** No live demo of the direct route (it returns 400 today). Don't
-claim it "almost works". Don't say you would put a headless browser in the
-worker path; the diagnosis showed it is not needed and it breaks the memory
-budget.
+claim it "almost works". Don't frame the provider as the answer; they are the
+provider, and this work is their product.
 
 ## Likely questions
 
@@ -287,7 +291,7 @@ problems show a growing oldest-waiting age with a normal outcome mix.
   OS-level kills, reservation expiry, or partial writes.
 - Two workers on one machine. Nothing here demonstrates production scale.
 - The direct adapter returns 400 until its signing rules match the current web
-  build. The diagnosis is in `evidence/direct-route-diagnosis.md`; tracking the
-  rotation in-house was deliberately not built.
+  build. The diagnosis is in `evidence/direct-route-diagnosis.md`; the rules
+  pipeline that would track rotations is designed above, not built.
 - If anything live fails during the call, use `evidence/`; every number quoted
   above is in there with its command and exit status.
