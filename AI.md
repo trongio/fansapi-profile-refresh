@@ -135,6 +135,12 @@ no route to MySQL/Redis, read-only root, no capabilities). Live, on
 2026-09-19: build `202609171554-a5a528bc87` was extracted, proved 8/8 and
 canaried, and a real background refresh of `madison420ivy` returned HTTP 200
 with 606,831 likes in one upstream request (`evidence/direct-route-live.txt`).
+Later additions, all tested: a delegated signer for builds that change the
+formula itself (the build's own function signs, via rulegen, canary
+required), signers stored per build, a live canary every 5 minutes on
+madison420ivy, automatic replay of held `signature_rejected` runs after a new
+build activates, and rejection/recovery metrics. The delegated path is
+proven on synthetic chunks only; no live build has needed it yet.
 The first live run exposed two bugs, both fixed with tests: the app shell
 contains a "Just a moment" placeholder that was misread as a challenge, and a
 random `x-bc` left in Redis by the old code was never replaced.

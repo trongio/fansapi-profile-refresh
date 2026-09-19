@@ -2,32 +2,49 @@
 
 namespace App\Refresh\Clients;
 
+use LogicException;
 use UnexpectedValueException;
 
 /**
- * One validated set of signing inputs for one OnlyFans web build. Built only
- * from locally extracted data (see OnlyfansRules::refresh) and never from a
- * remote rules feed; everything is shape-checked before it can sign anything.
+ * One validated signer for one OnlyFans web build, built only from locally
+ * extracted data (see OnlyfansRuleRefresher) and never from a remote rules
+ * feed. Everything is shape-checked before it can sign anything.
+ *
+ * Two modes:
+ *  - constants: the build still uses the known formula; PHP signs by itself
+ *    with OnlyfansSigner and the extracted constants.
+ *  - delegated: the build changed the formula, so the extracted function
+ *    itself is the signer; each signature comes from the rulegen service.
  */
 final readonly class OnlyfansRuleSet
 {
+    public const CONSTANTS = 'constants';
+
+    public const DELEGATED = 'delegated';
+
     private const SHA1_LENGTH = 40;
 
-    /** @param  list<int>  $checksumIndexes */
+    /** @param  list<int>|null  $checksumIndexes */
     private function __construct(
+        public string $mode,
         public string $revision,
         public string $appToken,
-        public string $staticParam,
-        public string $prefix,
-        public string $suffix,
-        public array $checksumIndexes,
-        public int $checksumConstant,
+        public ?string $staticParam,
+        public ?string $prefix,
+        public ?string $suffix,
+        public ?array $checksumIndexes,
+        public ?int $checksumConstant,
         public string $source,
     ) {}
 
     /** @param array<string, mixed> $payload */
     public static function fromArray(array $payload, string $source): self
     {
+        $mode = $payload['mode'] ?? self::CONSTANTS;
+        if (! in_array($mode, [self::CONSTANTS, self::DELEGATED], true)) {
+            throw new UnexpectedValueException('invalid signing-rule mode');
+        }
+
         $revision = self::requiredString($payload, 'revision', 64);
         if (preg_match('/\A20[0-9]{10}-[a-f0-9]{10}\z/', $revision) !== 1) {
             throw new UnexpectedValueException('invalid signing-rule revision');
@@ -38,6 +55,14 @@ final readonly class OnlyfansRuleSet
             throw new UnexpectedValueException('invalid signing-rule app token');
         }
 
+        if ($source === '' || strlen($source) > 64) {
+            throw new UnexpectedValueException('invalid signing-rule source');
+        }
+
+        if ($mode === self::DELEGATED) {
+            return new self($mode, $revision, $appToken, null, null, null, null, null, $source);
+        }
+
         $staticParam = self::requiredString($payload, 'static_param', 128);
         if (preg_match('/\A[\x21-\x7e]+\z/', $staticParam) !== 1) {
             throw new UnexpectedValueException('invalid signing-rule static_param');
@@ -46,7 +71,7 @@ final readonly class OnlyfansRuleSet
         $suffix = self::requiredToken($payload, 'suffix');
 
         $indexes = $payload['checksum_indexes'] ?? null;
-        if (! is_array($indexes) || $indexes === [] || ! array_is_list($indexes)) {
+        if (! is_array($indexes) || $indexes === [] || ! array_is_list($indexes) || count($indexes) > 4 * self::SHA1_LENGTH) {
             throw new UnexpectedValueException('invalid signing-rule checksum indexes');
         }
 
@@ -61,29 +86,21 @@ final readonly class OnlyfansRuleSet
             throw new UnexpectedValueException('invalid signing-rule checksum constant');
         }
 
-        if (count($indexes) > 4 * self::SHA1_LENGTH) {
-            throw new UnexpectedValueException('invalid signing-rule checksum indexes');
-        }
-
-        if ($source === '' || strlen($source) > 64) {
-            throw new UnexpectedValueException('invalid signing-rule source');
-        }
-
-        return new self(
-            $revision,
-            $appToken,
-            $staticParam,
-            $prefix,
-            $suffix,
-            array_values($indexes),
-            $constant,
-            $source,
-        );
+        return new self($mode, $revision, $appToken, $staticParam, $prefix, $suffix, array_values($indexes), $constant, $source);
     }
 
-    /** @return array<string, mixed> */
+    public function delegated(): bool
+    {
+        return $this->mode === self::DELEGATED;
+    }
+
+    /** @return array<string, mixed> Inputs for OnlyfansSigner (constants mode only). */
     public function signatureRules(): array
     {
+        if ($this->delegated()) {
+            throw new LogicException("build {$this->revision} is signed by its extracted function, not by constants");
+        }
+
         return [
             'app-token' => $this->appToken,
             'static_param' => $this->staticParam,
@@ -97,12 +114,12 @@ final readonly class OnlyfansRuleSet
     /** @return array<string, mixed> */
     public function toArray(): array
     {
-        return $this->signatureRules() + [
-            'revision' => $this->revision,
-        ];
+        $base = ['mode' => $this->mode, 'revision' => $this->revision, 'app-token' => $this->appToken];
+
+        return $this->delegated() ? $base : $base + $this->signatureRules();
     }
 
-    /** Same build and same signing inputs, wherever each copy came from. */
+    /** Same build and same signer, wherever each copy came from. */
     public function sameRulesAs(self $other): bool
     {
         return $this->toArray() === $other->toArray();

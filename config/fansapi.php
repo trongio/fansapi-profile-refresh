@@ -26,11 +26,19 @@ return [
         'rulegen_url' => env('ONLYFANS_RULEGEN_URL', 'http://rulegen:8080'),
         'rulegen_timeout_seconds' => (int) env('ONLYFANS_RULEGEN_TIMEOUT', 90),
         'rulegen_max_body_bytes' => 65536,
-        // Scheduled check cadence (a same-build check is one homepage fetch).
-        'rules_refresh_minutes' => (int) env('ONLYFANS_RULES_REFRESH_MINUTES', 30),
-        // Live canary before activation: one signed request that must return 200.
+        'rulegen_sign_timeout_seconds' => (int) env('ONLYFANS_RULEGEN_SIGN_TIMEOUT', 3),
+        // Build watch: how often the current build id (x-of-rev) is read from
+        // the homepage. A same-build check is one homepage fetch.
+        'rules_refresh_minutes' => (int) env('ONLYFANS_RULES_REFRESH_MINUTES', 10),
+        // Live canary: before any activation (required when the formula
+        // changed), and on the active signer every rules_canary_minutes.
         'rules_canary' => (bool) env('ONLYFANS_RULES_CANARY', true),
-        'canary_username' => env('ONLYFANS_CANARY_USERNAME', 'onlyfans'),
+        'rules_canary_minutes' => (int) env('ONLYFANS_RULES_CANARY_MINUTES', 5),
+        'canary_username' => env('ONLYFANS_CANARY_USERNAME', 'madison420ivy'),
+        // The canary must return THIS profile, not just any 200.
+        'canary_upstream_id' => (string) env('ONLYFANS_CANARY_UPSTREAM_ID', '5140520'),
+        // Held signature_rejected runs replayed once per new build.
+        'auto_replay_limit' => (int) env('ONLYFANS_AUTO_REPLAY_LIMIT', 200),
         // A burst of rejections asks for at most one refresh per window.
         'rules_request_cooldown_seconds' => (int) env('ONLYFANS_RULES_REQUEST_COOLDOWN', 120),
         // A rejected run is retried once, after this delay, and only if a

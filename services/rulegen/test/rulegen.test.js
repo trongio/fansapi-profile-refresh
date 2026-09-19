@@ -11,10 +11,12 @@ const { runExtraction } = require('../src/extract');
 const { parseHomepage, extractAppToken, isChallenge, discover } = require('../src/discover');
 const { referenceSign } = require('../src/reference-sign');
 const { createServer, resetState } = require('../src/server');
+const { createSigner } = require('../src/signer');
 
 const proofInputs = require('../contract/proof-inputs.json');
 const vectors = require('../contract/sign-vectors.json');
 const synthetic = fs.readFileSync(path.join(__dirname, 'fixtures/synthetic-chunk.js'), 'utf8');
+const syntheticV2 = fs.readFileSync(path.join(__dirname, 'fixtures/synthetic-chunk-v2.js'), 'utf8');
 const UA = 'Mozilla/5.0 test';
 
 const REV = '202609171554-a5a528bc87';
@@ -36,6 +38,7 @@ test('extraction recovers the exact constants of the synthetic signer', () => {
     assert.equal(r.suffix, 'abcd1234');
     assert.deepEqual(r.checksum_indexes, [1, 1, 5, 9, 22, 39]);
     assert.equal(r.checksum_constant, -77);
+    assert.equal(r.mode, 'constants');
     assert.equal(r.sentry_release, '202609010000-0123456789');
 });
 
@@ -143,6 +146,8 @@ async function withServer(deps, fn) {
     try {
         await fn(base);
     } finally {
+        resetState();
+        server.closeAllConnections();
         server.close();
     }
 }
@@ -196,4 +201,78 @@ test('server: failures are explicit 502s', async () => {
 test('committed synthetic extraction (replayed by the PHP tests) is current', () => {
     const committed = require('../contract/synthetic-extract.json');
     assert.deepEqual(extract({ source: synthetic, proof_inputs: proofInputs, user_agent: UA }), committed);
+});
+
+test('committed delegated extraction (replayed by the PHP tests) is current', () => {
+    const committed = require('../contract/synthetic-extract-delegated.json');
+    assert.deepEqual(extract({ source: syntheticV2, proof_inputs: proofInputs, user_agent: UA }), committed);
+});
+
+test('a changed formula falls back to delegated mode with real proof signs', () => {
+    const r = extract({ source: syntheticV2, proof_inputs: proofInputs, user_agent: UA });
+
+    assert.equal(r.mode, 'delegated');
+    assert.match(r.reason, /do not reproduce/);
+    assert.equal(r.static_param, undefined);
+    assert.equal(r.proof.length, proofInputs.length);
+    // Same hash, but the checksum now depends on the path length.
+    const v1 = extract({ source: synthetic, proof_inputs: proofInputs, user_agent: UA });
+    assert.notDeepEqual(r.proof.map((p) => p.sign), v1.proof.map((p) => p.sign));
+});
+
+test('a reordered hash input is also detected as a formula change', () => {
+    const reordered = synthetic.replace('[d(0),time,url,uid]', '[time,d(0),url,uid]');
+    assert.notEqual(reordered, synthetic);
+    assert.equal(extract({ source: reordered, proof_inputs: proofInputs, user_agent: UA }).mode, 'delegated');
+});
+
+test('the long-lived signer reproduces the real function and recovers from a hang', async () => {
+    const expected = extract({ source: syntheticV2, proof_inputs: proofInputs, user_agent: UA }).proof;
+    const signer = createSigner(syntheticV2, UA, 1500);
+    try {
+        for (const p of expected.slice(0, 4)) {
+            assert.deepEqual(await signer.sign(p.path, p.time), { sign: p.sign, time: p.time });
+        }
+    } finally {
+        signer.close();
+    }
+
+    const hanging = createSigner('(self.webpackChunkof_vue=self.webpackChunkof_vue||[]).push([[1],{1:function(m,e){e.A=function(r){if(r.url.indexOf("hang")>=0){for(;;){}}return{time:Date.now(),sign:"a:b"}}}}]);', UA, 800);
+    try {
+        await assert.rejects(hanging.sign('/api2/v2/users/hang', '1700000000000'), { code: 'SIGN_TIMEOUT' });
+        // Killed and respawned: the next request works again.
+        const again = await hanging.sign('/api2/v2/users/a', '1700000000000');
+        assert.equal(again.time, '1700000000000');
+    } finally {
+        hanging.close();
+    }
+});
+
+test('server: /v1/sign serves only a loaded delegated build and validates input', async () => {
+    const calls = { discover: 0, extract: 0 };
+    const deps = {
+        discoverFn: async () => ({ revision: '202609010000-0123456789', load: async () => ({ appToken: '33d57ade8c02dbc5a333db99ff9ae26a', chunks: [{ url: chunkUrl('9999'), source: syntheticV2 }] }) }),
+        extractFn: async (source, inputs, ua) => { calls.extract++; return extract({ source, proof_inputs: inputs, user_agent: ua }); },
+    };
+    await withServer(deps, async (base) => {
+        const sign = (body) => fetch(`${base}/v1/sign`, { method: 'POST', body: JSON.stringify(body) });
+        const good = { revision: '202609010000-0123456789', path: '/api2/v2/users/madison420ivy' };
+
+        assert.equal((await sign(good)).status, 409, 'nothing loaded yet');
+
+        const extracted = await fetch(`${base}/v1/extract`, { method: 'POST' }).then((r) => r.json());
+        assert.equal(extracted.mode, 'delegated');
+        assert.equal(extracted.source, undefined, 'chunk source never leaves the service');
+
+        const res = await sign(good);
+        assert.equal(res.status, 200);
+        const body = await res.json();
+        assert.match(body.time, /^\d{13}$/);
+        assert.match(body.sign, /^12345:[0-9a-f]{40}:[0-9a-f]+:abcd1234$/);
+
+        assert.equal((await sign({ ...good, path: 'https://evil.example/x' })).status, 400);
+        assert.equal((await sign({ ...good, path: '/api2/v2/users/a/../../x' })).status, 400);
+        assert.equal((await sign({ ...good, revision: '202609020000-0123456789' })).status, 409);
+        assert.equal((await fetch(`${base}/v1/sign`, { method: 'POST', body: 'x'.repeat(600) })).status, 400);
+    });
 });

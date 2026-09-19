@@ -22,3 +22,13 @@ $ docker compose exec scheduler php artisan fans:demo live --source=onlyfans
 Headers sent: app-token, sign, time, x-bc (from cdn2.onlyfans.com/key/),
 User-Agent, Accept, Referer. Not sent: cookies, x-hash, x-of-rev, user-id.
 No remote rules feed; downloaded JS ran only in the rulegen container.
+
+Rotation machinery, live (2026-09-19, after the rotation-proof update)
+----------------------------------------------------------------------
+$ fans:onlyfans-rules --status      legacy record migrated to build keys;
+                                    active 202609171554-a5a528bc87, constants mode
+$ fans:onlyfans-rules --force       outcome unchanged (same build)
+$ fans:onlyfans-rules --canary      canary madison420ivy: ok (200, id 5140520)
+$ fans:demo live --source=onlyfans  succeeded, 1 upstream request, likes 606835
+Delegated mode (formula change) is exercised by tests on synthetic chunks;
+no live build has required it yet.

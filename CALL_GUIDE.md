@@ -168,34 +168,36 @@ and `x-hash`, which we do not.
 I tested it properly it was wrong. The real dependency is the rule rotation."
 Saying this first is better than being caught on it.
 
-**What was built after that.**
-1. Get current rules ourselves, not from a community repo that lags by days.
-   `services/rulegen` fetches the homepage (curl-impersonate, no challenge
-   solving), rebuilds the signing chunk URL under
-   `static2.onlyfans.com/static/prod/<hex>/<x-of-rev>/`, and runs the chunk in
-   a killable, permission-restricted child process with its SHA-1 stubbed, so
-   the constants are recovered by execution, not pattern matching.
-2. Verify before publishing: the real extracted function signs 8 fixed inputs;
-   PHP must reproduce every sign exactly, then one canary request for a public
-   profile must return 200. Only then are the rules activated in Redis,
-   versioned by `x-of-rev`; workers pick them up with no deploy.
-3. Detect rotation: a scheduled check every 30 minutes, plus an immediate
-   request from any `signature_rejected`, rate limited to one per window.
-4. `x-bc` comes from `cdn2.onlyfans.com/key/`; `x-hash` is not enforced on the
-   profile endpoint, so it is not sent.
+**What was built after that.** Detect, fetch, lift, verify, publish, canary:
+1. Detect: the build id (`x-of-rev`) is read from the homepage every 10
+   minutes, and at once when any request or the canary is rejected.
+2. Fetch: `x-bc` from `cdn2.onlyfans.com/key/`; `x-hash` is not enforced on
+   the profile endpoint, so it is not sent.
+3. Lift: `services/rulegen` runs the build's signing chunk in a killable,
+   permission-restricted child process. If the formula is the known one, the
+   constants are derived and PHP signs by itself. If OnlyFans changed the
+   formula, the build's own function becomes the signer (delegated mode,
+   `POST /v1/sign`).
+4. Verify: 8 proof signs from the real function must match PHP exactly
+   (constants mode), then one canary for `madison420ivy` must return 200 and
+   id `5140520`. Delegated signers are never activated without the canary.
+5. Publish: Redis, keyed by build, with active and previous pointers;
+   workers pick it up with no deploy.
+6. Canary: the same live check on the active signer every 5 minutes.
 
 Nothing downstream changes: the normalizer already accepts the unwrapped
 direct shape, and writes, revisions and memory do not care which adapter ran.
 
-**Without the fallback.**
-There is nothing to switch to, so a rotation must not lose data. The active
-rules are last-known-good and survive any failed discovery, extraction, proof
-or canary. A rejected run is retried once, and only if a newer verified
-revision was activated meanwhile; otherwise it is dead-lettered, the last good
-snapshot is kept, and it is replayable. If Cloudflare blocks the homepage, the
-failure is explicit (`DISCOVERY_CHALLENGED`) and the old rules keep serving
-until they are actually rejected. The number to watch is time from rotation to
-recovery.
+**Without the fallback.** Retry, hold, serve stale, replay, all built:
+the active signer is last-known-good and survives any failed discovery,
+extraction, proof or canary. A rejected run is retried once, and only if a
+newer verified build was activated meanwhile; otherwise it is held in the
+dead-letter queue and the last good snapshot keeps being served with its
+refresh time. When the next build activates, held `signature_rejected` runs
+are replayed automatically. A Cloudflare block on the homepage is explicit
+(`DISCOVERY_CHALLENGED`); the old signer keeps serving until it is actually
+rejected. Measured: rejections per build and time from first rejection to
+recovery (`fans:onlyfans-rules --status`).
 
 **Where a browser is and is not acceptable.**
 Never in the workers: that is where memory matters. The rules service uses

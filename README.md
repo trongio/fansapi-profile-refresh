@@ -90,11 +90,32 @@ an account:
    then activates the rules in Redis. Every failure is recorded and the active
    rules stay as they were (last-known-good, no TTL). A distributed lock keeps it
    to one refresh at a time.
-4. The scheduler runs `fans:onlyfans-rules` every minute. It does nothing
-   unless an OnlyFans-direct account exists and either a rejection asked for a
-   refresh or the periodic check (`ONLYFANS_RULES_REFRESH_MINUTES`, 30) is due.
-   The period counts failed attempts too, so a blocked homepage is retried once
-   per period, not every minute.
+4. **If OnlyFans changes the formula itself**, not just its constants, the
+   derived constants no longer reproduce the real function's proof signs.
+   The build is then extracted in **delegated** mode: rulegen keeps that
+   build's own sign function loaded in a long-lived sandboxed child and
+   answers `POST /v1/sign` (a build id plus a path matching
+   `/api2/v2/users/<name>`, time set by rulegen). PHP asks it for each
+   signature. A delegated signer is only activated after a live canary.
+   Limit: this covers changes inside the sign function; if it stops using
+   the same SHA-1 and lodash-get dependencies, extraction fails explicitly.
+5. Signers are stored **per build** (`fansapi:onlyfans:rules:build:{x-of-rev}`)
+   with an `active` and a `previous` pointer; the last 5 builds are kept.
+6. The scheduler runs `fans:onlyfans-rules` every minute. Only while an
+   OnlyFans-direct account exists, it:
+   - watches the build id every `ONLYFANS_RULES_REFRESH_MINUTES` (10), or
+     at once when a rejection asked for it. The period counts failed
+     attempts, so a blocked homepage is retried once per period;
+   - canaries the active signer every `ONLYFANS_RULES_CANARY_MINUTES` (5)
+     against `madison420ivy`, which must answer 200 with id `5140520`. A
+     rejection there requests a refresh right away, so a rotation is usually
+     caught before real jobs fail.
+7. After a new build activates, runs held in the dead-letter queue for
+   `signature_rejected` are **replayed once** through the ordinary replay
+   (bounded by `ONLYFANS_AUTO_REPLAY_LIMIT`).
+8. Rejections are counted per build, and each activation records the time
+   from the old build's first rejection to recovery:
+   `fans:onlyfans-rules --status`.
 
 **Isolation.** Laravel workers never execute downloaded JavaScript, and
 `node:vm` is not treated as a boundary. The `rulegen` container has no host
@@ -120,8 +141,9 @@ request.
 Operator commands:
 
 ```
+docker compose exec scheduler php artisan fans:onlyfans-rules --status
 docker compose exec scheduler php artisan fans:onlyfans-rules --force
-docker compose exec scheduler php artisan fans:onlyfans-rules --force --no-canary
+docker compose exec scheduler php artisan fans:onlyfans-rules --canary
 ```
 
 **Diagnosis that led here (`evidence/direct-route-diagnosis.md`).** The earlier
