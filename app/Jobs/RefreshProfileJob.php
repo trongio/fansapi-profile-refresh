@@ -8,6 +8,7 @@ use App\Models\RefreshRun;
 use App\Refresh\Admission;
 use App\Refresh\Clients\ClientFactory;
 use App\Refresh\Clients\ClientResult;
+use App\Refresh\Clients\OnlyfansRules;
 use App\Refresh\InvalidPayload;
 use App\Refresh\Outcome;
 use App\Refresh\ProfileNormalizer;
@@ -63,6 +64,7 @@ class RefreshProfileJob implements ShouldQueue
         RunRecorder $recorder,
         Admission $admission,
         RefreshLogger $log,
+        OnlyfansRules $signingRules,
     ): void {
         // The job never needs the stored snapshot; only the writer does, under
         // its own lock. Leaving the JSON column out keeps the old snapshot from
@@ -129,6 +131,17 @@ class RefreshProfileJob implements ShouldQueue
 
             $run->forceFill(['status' => RunStatus::Running])->save();
 
+            // A run already rejected once is retried only against a NEWER
+            // verified signing revision; otherwise it ends here, with no
+            // upstream request spent.
+            $rejectedRevision = Cache::get(self::signatureRetryKey($run->id));
+            if (is_string($rejectedRevision) && ($signingRules->current()?->revision ?? 'none') === $rejectedRevision) {
+                $this->deadLetter($run, $recorder, Outcome::SIGNATURE_REJECTED,
+                    "signature rejected for signing revision {$rejectedRevision}; no newer verified revision was activated");
+
+                return;
+            }
+
             $client = $clients->for($run->account);
 
             // HTTP happens outside every database transaction.
@@ -173,6 +186,7 @@ class RefreshProfileJob implements ShouldQueue
 
             match (true) {
                 $result->category === Outcome::THROTTLED => $this->handleThrottle($run, $result, $admission, $log),
+                $result->category === Outcome::SIGNATURE_REJECTED => $this->handleSignatureRejected($run, $result, $recorder, $log),
                 $result->retryable() => $this->releaseRun($run, $this->backoffSeconds($run), $result->category, $log),
                 default => $this->deadLetter($run, $recorder, $result->category, $result->message ?? $result->category),
             };
@@ -214,6 +228,32 @@ class RefreshProfileJob implements ShouldQueue
         $this->releaseRun($run, $delay, Outcome::THROTTLED, $log, [
             'retry_after_seconds' => $result->retryAfterSeconds,
         ]);
+    }
+
+    /**
+     * At most one retry per logical run. The client has already asked the
+     * scheduler for a rules refresh; the retry waits long enough for it and
+     * is skipped above if no newer revision was activated in the meantime.
+     */
+    private function handleSignatureRejected(RefreshRun $run, ClientResult $result, RunRecorder $recorder, RefreshLogger $log): void
+    {
+        $revision = $result->signingRevision ?? 'none';
+        $ttl = max(60, $run->deadline_at->getTimestamp() - Carbon::now()->getTimestamp() + 60);
+
+        if (! Cache::add(self::signatureRetryKey($run->id), $revision, $ttl)) {
+            $this->deadLetter($run, $recorder, Outcome::SIGNATURE_REJECTED, $result->message ?? 'signature rejected again');
+
+            return;
+        }
+
+        $this->releaseRun($run, (int) config('fansapi.onlyfans.signature_retry_delay_seconds'), Outcome::SIGNATURE_REJECTED, $log, [
+            'rejected_signing_revision' => $revision,
+        ]);
+    }
+
+    public static function signatureRetryKey(int $runId): string
+    {
+        return 'fansapi:onlyfans:signature-retry:'.$runId;
     }
 
     private function backoffSeconds(RefreshRun $run): int

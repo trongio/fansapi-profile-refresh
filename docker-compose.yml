@@ -96,11 +96,13 @@ services:
     command: ["php", "artisan", "horizon"]
     stop_grace_period: 45s
     stop_signal: SIGTERM
+    networks: [default, rulegen]
 
   scheduler:
     <<: *php
     command: ["php", "artisan", "schedule:work"]
     stop_grace_period: 45s
+    networks: [default, rulegen]
 
   # Private, concurrent fixture upstream used by the workload + tests.
   # PHP_CLI_SERVER_WORKERS makes it fork, so a slow account A response
@@ -115,6 +117,36 @@ services:
       HOME: /tmp
       PHP_CLI_SERVER_WORKERS: "10"
     ports: ["127.0.0.1:9000:9000"]
+
+  # Signing-rules extractor: the ONLY place downloaded OnlyFans JS runs, in a
+  # killable child process. It is reachable only on the internal "rulegen"
+  # network (by horizon and the scheduler), has internet egress on its own
+  # network but no route to mysql/redis, no host port, no bind mount, no .env,
+  # a read-only root, no capabilities and hard resource limits. It exposes two
+  # fixed operations and accepts no URL, revision or code from callers.
+  rulegen:
+    build: { context: services/rulegen }
+    image: fansapi-rulegen:local
+    user: "10001:10001"
+    read_only: true
+    tmpfs: ["/tmp:size=16m,noexec,nosuid,nodev"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 64
+    mem_limit: 512m
+    cpus: 1.0
+    networks: [rulegen, rulegen_egress]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  rulegen:
+    internal: true
+  rulegen_egress: {}
 
 volumes:
   mysql-data:

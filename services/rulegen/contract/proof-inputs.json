@@ -1,0 +1,10 @@
+[
+  {"path": "/api2/v2/users/onlyfans", "time": "1700000000000"},
+  {"path": "/api2/v2/users/madison420ivy", "time": "1700000000001"},
+  {"path": "/api2/v2/users/12345678", "time": "1712345678901"},
+  {"path": "/api2/v2/users/a", "time": "1750000000000"},
+  {"path": "/api2/v2/users/some.user_name-x", "time": "1760000123456"},
+  {"path": "/api2/v2/users/list?a=1&b=two", "time": "1789840029763"},
+  {"path": "/api2/v2/users/%C3%A9t%C3%A9", "time": "1799999999999"},
+  {"path": "/api2/v2/init", "time": "1800000000000"}
+]

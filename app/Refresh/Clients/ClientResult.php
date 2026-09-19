@@ -15,6 +15,9 @@ final class ClientResult
         public readonly int $durationMs,
         public readonly ?int $retryAfterSeconds = null,
         public readonly ?string $message = null,
+        // Direct OnlyFans only: the signing-rule revision a rejection was
+        // signed with ("none" when there were no rules), for the retry rule.
+        public readonly ?string $signingRevision = null,
     ) {}
 
     public function ok(): bool

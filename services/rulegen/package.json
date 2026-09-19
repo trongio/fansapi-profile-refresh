@@ -1,0 +1,15 @@
+{
+  "name": "fansapi-rulegen",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Internal service: discovers the current OnlyFans signing chunk and extracts signing rules in a killable sandboxed child process.",
+  "type": "commonjs",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  }
+}

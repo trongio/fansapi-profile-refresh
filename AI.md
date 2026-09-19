@@ -115,25 +115,29 @@ escaping applies.
 
 The reviewer's follow-up framed OnlyFans itself as the upstream and said no
 account is needed. A direct adapter was added and made the default live source:
-`OnlyfansSigner` reproduces the web client's request signing (unit-tested
-against a fixed vector), `OnlyfansRules` fetches and caches the rotating
-parameters, and `OnlyfansDirectClient` sends a signed anonymous request with no
-browser and no account.
+`OnlyfansSigner` reproduces the web client's request signing, and
+`OnlyfansDirectClient` sends a signed anonymous request with no browser and no
+account.
 
-What it actually returns, verified on this machine: `HTTP 400
-{"error":{"code":401,"message":"Please refresh the page"}}`. A signed request
-is not enough. The first write-up blamed a session issued on a page load with a
-JS challenge; a later probe (`evidence/direct-route-diagnosis.md`) showed that
-was wrong. The API path is not challenged, an anonymous `sess` cookie is issued
-without a page load, and a logged-out browser request that succeeds is signed
-with a different prefix and suffix than the community-published rules. The
-rules were stale after a web build rotation, and the browser also sends
-`x-of-rev` and `x-hash`. The adapter surfaces the rejection as
-`signature_rejected`, drops the cached rules, dead-letters the run and
-preserves the last valid data. The managed provider remains the fallback that
-returns data. Deriving current rules and `x-hash` from the client bundle was
-not built: it is ongoing work that follows every OnlyFans release and needs a
-proper design, which is sketched in `CALL_GUIDE.md` instead.
+The first version consumed community-published rules; they lagged a web build
+rotation and every request was rejected (`evidence/direct-route-diagnosis.md`).
+That feed was removed. The rules are now extracted locally: the internal
+`services/rulegen` container fetches the current build's signing chunk and runs
+it in a killable, permission-restricted child process to recover the constants
+(method adapted from mikigoalie/onlyfans-rulegen, MIT). PHP recomputes 8 proof
+signs from the real extracted function, runs one live canary, and only then
+activates the rules as last-known-good in Redis.
+
+Verified on this machine: the extractor recovers the exact constants of a
+synthetic chunk and of two archived real chunks; the PHP signer matches the
+Node reference on shared vectors; the container isolation holds (no host port,
+no route to MySQL/Redis, read-only root, no capabilities). Live, on
+2026-09-19: build `202609171554-a5a528bc87` was extracted, proved 8/8 and
+canaried, and a real background refresh of `madison420ivy` returned HTTP 200
+with 606,831 likes in one upstream request (`evidence/direct-route-live.txt`).
+The first live run exposed two bugs, both fixed with tests: the app shell
+contains a "Just a moment" placeholder that was misread as a challenge, and a
+random `x-bc` left in Redis by the old code was never replaced.
 
 ## What remains unverified
 

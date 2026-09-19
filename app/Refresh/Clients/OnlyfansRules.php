@@ -4,64 +4,182 @@ namespace App\Refresh\Clients;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
+use Throwable;
+use UnexpectedValueException;
 
 /**
- * Where the signing parameters come from.
+ * Store for the active signing rules and the CDN-issued x-bc value.
  *
- * OnlyFans rotates them; the community re-publishes them. We fetch from the
- * configured URL, cache for an hour, and fall back to the copy committed in
- * fixtures/ so the client still runs offline. The x-bc device id is generated
- * once and cached, exactly as the web client stores its own in localStorage.
+ * The active rules are written only by OnlyfansRuleRefresher, after local
+ * extraction and verification. They have no TTL: they are the last-known-good
+ * copy and survive any failed discovery, extraction or canary. There is no
+ * remote rules feed and no committed fallback.
  */
 class OnlyfansRules
 {
-    public const CACHE_KEY = 'fansapi:onlyfans:dynamic-rules';
+    public const ACTIVE_KEY = 'fansapi:onlyfans:rules:active';
+
+    public const PREVIOUS_KEY = 'fansapi:onlyfans:rules:previous';
+
+    public const STATUS_KEY = 'fansapi:onlyfans:rules:status';
+
+    public const LOCK_KEY = 'fansapi:onlyfans:rules:lock';
+
+    public const REQUESTED_KEY = 'fansapi:onlyfans:rules:requested';
+
+    public const REQUEST_COOLDOWN_KEY = 'fansapi:onlyfans:rules:request-cooldown';
 
     public const DEVICE_KEY = 'fansapi:onlyfans:x-bc';
 
-    /** @return array<string,mixed> */
-    public function current(): array
+    public function current(): ?OnlyfansRuleSet
     {
-        return Cache::remember(self::CACHE_KEY, (int) config('fansapi.onlyfans.rules_ttl_seconds'), function (): array {
-            $url = (string) config('fansapi.onlyfans.rules_url');
+        $record = Cache::get(self::ACTIVE_KEY);
+        if (! is_array($record) || ! is_array($record['rules'] ?? null)) {
+            return null;
+        }
 
-            if ($url !== '') {
-                try {
-                    $fetched = Http::timeout(5)->get($url)->throw()->json();
-                    if ($this->valid($fetched)) {
-                        return $fetched + ['_source' => 'remote'];
-                    }
-                } catch (\Throwable) {
-                    // fall through to the committed copy
-                }
+        try {
+            return OnlyfansRuleSet::fromArray($record['rules'], (string) ($record['source'] ?? 'rulegen'));
+        } catch (UnexpectedValueException) {
+            return null;
+        }
+    }
+
+    /** @return array<string, mixed>|null */
+    public function activeRecord(): ?array
+    {
+        $record = Cache::get(self::ACTIVE_KEY);
+
+        return is_array($record) ? $record : null;
+    }
+
+    /** Previous active copy moves aside; the new one becomes last-known-good. */
+    public function activate(OnlyfansRuleSet $rules, string $verified): void
+    {
+        if (($active = $this->activeRecord()) !== null) {
+            Cache::forever(self::PREVIOUS_KEY, $active);
+        }
+
+        Cache::forever(self::ACTIVE_KEY, [
+            'rules' => $rules->toArray(),
+            'source' => $rules->source,
+            'verified' => $verified,
+            'activated_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /** @return array<string, mixed>|null */
+    public function status(): ?array
+    {
+        $status = Cache::get(self::STATUS_KEY);
+
+        return is_array($status) ? $status : null;
+    }
+
+    /** @param array<string, mixed> $status */
+    public function recordStatus(array $status): void
+    {
+        Cache::forever(self::STATUS_KEY, $status + ['attempted_at' => now()->toIso8601String()]);
+    }
+
+    /**
+     * Ask the scheduler for one refresh. Rate limited, so a burst of rejected
+     * profile requests produces a single request, not a storm.
+     */
+    public function requestRefresh(string $reason): bool
+    {
+        $cooldown = (int) config('fansapi.onlyfans.rules_request_cooldown_seconds');
+        if (! Cache::add(self::REQUEST_COOLDOWN_KEY, 1, $cooldown)) {
+            return false;
+        }
+
+        Cache::put(self::REQUESTED_KEY, substr($reason, 0, 120), $cooldown * 10);
+
+        return true;
+    }
+
+    public function refreshRequested(): ?string
+    {
+        $reason = Cache::get(self::REQUESTED_KEY);
+
+        return is_string($reason) ? $reason : null;
+    }
+
+    public function clearRefreshRequest(): void
+    {
+        Cache::forget(self::REQUESTED_KEY);
+    }
+
+    public function browserCode(): ?string
+    {
+        $cached = Cache::get(self::DEVICE_KEY);
+        if (self::validBrowserCode($cached)) {
+            return $cached;
+        }
+
+        // Missing, expired, or not a CDN-issued value (an older build stored a
+        // random id here with no TTL): fetch a real one.
+        $value = strtolower(trim((string) $this->fetchText((string) config('fansapi.onlyfans.x_bc_url'), 256)));
+        if (! self::validBrowserCode($value)) {
+            Cache::forget(self::DEVICE_KEY);
+
+            return null;
+        }
+
+        Cache::put(self::DEVICE_KEY, $value, (int) config('fansapi.onlyfans.x_bc_ttl_seconds'));
+
+        return $value;
+    }
+
+    private static function validBrowserCode(mixed $value): bool
+    {
+        return is_string($value) && preg_match('/\A[a-f0-9]{40}\z/', $value) === 1;
+    }
+
+    /** x-bc is cheap to refetch; the signing rules are never dropped here. */
+    public function forgetBrowserCode(): void
+    {
+        Cache::forget(self::DEVICE_KEY);
+    }
+
+    private function fetchText(string $url, int $limit): ?string
+    {
+        if ($url === '' || $limit < 1) {
+            return null;
+        }
+
+        try {
+            $response = Http::connectTimeout(3)
+                ->timeout(5)
+                ->withOptions(['stream' => true, 'http_errors' => false, 'allow_redirects' => false])
+                ->get($url);
+
+            if (! $response->successful()) {
+                return null;
             }
 
-            // Optional committed fallback for offline runs. Absent by default;
-            // the rules are normally fetched from the configured URL above.
-            $path = base_path('fixtures/onlyfans-dynamic-rules.json');
-            $local = is_file($path) ? json_decode((string) file_get_contents($path), true) : null;
+            $stream = $response->toPsrResponse()->getBody();
+            $buffer = '';
 
-            return ($this->valid($local) ? $local : []) + ['_source' => $local ? 'fixture' : 'none'];
-        });
-    }
+            try {
+                while (! $stream->eof()) {
+                    $chunk = $stream->read(8192);
+                    if ($chunk === '') {
+                        break;
+                    }
 
-    /** Force a refetch, used after the upstream reports a stale signature. */
-    public function forget(): void
-    {
-        Cache::forget(self::CACHE_KEY);
-    }
+                    $buffer .= $chunk;
+                    if (strlen($buffer) > $limit) {
+                        return null;
+                    }
+                }
+            } finally {
+                $stream->close();
+            }
 
-    public function deviceId(): string
-    {
-        return Cache::rememberForever(self::DEVICE_KEY, fn () => Str::lower(Str::random(40)));
-    }
-
-    private function valid(mixed $rules): bool
-    {
-        return is_array($rules)
-            && isset($rules['static_param'], $rules['prefix'], $rules['suffix'], $rules['app-token'])
-            && is_array($rules['checksum_indexes'] ?? null)
-            && is_int($rules['checksum_constant'] ?? null);
+            return $buffer;
+        } catch (Throwable) {
+            return null;
+        }
     }
 }

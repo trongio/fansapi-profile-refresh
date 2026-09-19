@@ -58,47 +58,77 @@ an account:
 
 - `OnlyfansSigner` computes the `sign` header, `sha1(static \n time \n path \n
   user_id)` plus a checksum over selected digits, exactly as the web client
-  does. It is a pure function with a unit test pinning it.
-- `OnlyfansRules` fetches the rotating parameters from a community-maintained
-  source, caches them for an hour, and generates the `x-bc` device id once, the
-  way the browser stores its own in `localStorage`.
+  does. It is a pure function, pinned by vectors shared with the Node side
+  (`services/rulegen/contract/sign-vectors.json`).
+- The rotating inputs (`static_param`, prefix, suffix, checksum index multiset
+  and constant, `app-token`) are **extracted locally from the current web
+  build**. There is no remote or community rules feed and no committed rules
+  file.
+- `x-bc` is fetched from `https://cdn2.onlyfans.com/key/`, as the web client
+  does. `x-hash`, `x-of-rev`, cookies and the `user-id` header are not sent;
+  the profile endpoint does not need them (`evidence/direct-route-diagnosis.md`).
 
-As of this submission, a correctly signed **anonymous** request still returns:
+**How the rules are obtained.**
+
+1. `services/rulegen` is a small internal Node service (Compose service
+   `rulegen`). `POST /v1/extract` takes no input. It fetches
+   `https://onlyfans.com/` through a pinned curl-impersonate (browser TLS
+   fingerprint), matches the signing chunk URL, and **rebuilds** every script
+   URL from the matched parts, so it only ever requests
+   `static2.onlyfans.com/static/prod/<hex>/<revision>/<name>.js`. A Cloudflare
+   challenge is reported as `DISCOVERY_CHALLENGED`; nothing tries to solve it.
+2. Each candidate chunk runs in a fresh child process (Node permission model:
+   no writes, no child processes, read access to its own directory only; empty
+   environment; 96 MB heap; SIGKILL after 15 s). The webpack module is executed
+   with its SHA-1 and lodash-get dependencies stubbed, which recovers the
+   constants by probing (method adapted from mikigoalie/onlyfans-rulegen, MIT,
+   see `services/rulegen/NOTICE`). The real function then signs 8 fixed
+   inputs with real SHA-1; those are the proof vectors.
+3. PHP (`OnlyfansRuleRefresher`, run by `fans:onlyfans-rules`) validates the
+   shape, recomputes all 8 proof signs with `OnlyfansSigner` (must match
+   exactly), sends one live canary request (`ONLYFANS_RULES_CANARY`), and only
+   then activates the rules in Redis. Every failure is recorded and the active
+   rules stay as they were (last-known-good, no TTL). A distributed lock keeps it
+   to one refresh at a time.
+4. The scheduler runs `fans:onlyfans-rules` every minute. It does nothing
+   unless an OnlyFans-direct account exists and either a rejection asked for a
+   refresh or the periodic check (`ONLYFANS_RULES_REFRESH_MINUTES`, 30) is due.
+   The period counts failed attempts too, so a blocked homepage is retried once
+   per period, not every minute.
+
+**Isolation.** Laravel workers never execute downloaded JavaScript, and
+`node:vm` is not treated as a boundary. The `rulegen` container has no host
+port, no bind mount, no `.env`, a read-only root, all capabilities dropped,
+`no-new-privileges`, and pids/memory/CPU limits. It sits on an internal network
+shared only with `horizon` and `scheduler`, plus its own egress network, so it
+cannot reach MySQL or Redis. It returns data that PHP verifies; the proof shows
+the derived constants reproduce the extracted function, and the canary shows
+OnlyFans accepts them.
+
+**Rejections.** A `signature_rejected` answer keeps the active rules, drops
+only the cached `x-bc`, and asks for one refresh (rate limited). The run is
+retried once, after `ONLYFANS_SIGNATURE_RETRY_DELAY` seconds, and only if a
+newer verified revision was activated in the meantime; otherwise it is
+dead-lettered without spending another upstream request. The last valid data is
+always preserved.
+
+Live result (2026-09-19, `evidence/direct-route-live.txt`): build
+`202609171554-a5a528bc87` extracted, proved and canaried; a background refresh
+of `madison420ivy` returned HTTP 200 (upstream id 5140520, 606,831 likes) in one
+request.
+
+Operator commands:
 
 ```
-HTTP 400  {"error":{"code":401,"message":"Please refresh the page"}}
+docker compose exec scheduler php artisan fans:onlyfans-rules --force
+docker compose exec scheduler php artisan fans:onlyfans-rules --force --no-canary
 ```
 
-**Diagnosis (follow-up probe, `evidence/direct-route-diagnosis.md`).** The
-submission originally blamed a JS challenge on page load. That was wrong, and
-the probe shows what actually fails:
-
-- The API path is not behind the Cloudflare challenge. Only the HTML homepage
-  is. Signed calls to `/api2/v2/...` reach the OnlyFans application, which
-  answers in JSON.
-- The anonymous session is not the blocker. The first signed call is handed a
-  `sess` cookie with no page load. Replaying with that cookie still returns 400.
-- The signing rules are stale. A logged-out browser request that returns 200
-  signs with prefix `65335` and suffix `6aac0d65`. The community rules the
-  adapter fetches still carry `26974` and `669fb034`. The web build had rotated
-  two days earlier (`x-of-rev: 202609171554-...`) and the published rules had
-  not caught up.
-- The browser also sends `x-of-rev` and `x-hash`, and uses its `fp` cookie as
-  `x-bc`. The adapter sends none of that.
-
-So the last mile is not a browser. It is **owning rule rotation**: detect a new
-web build, derive the rules and the `x-hash` from the current client bundle,
-and swap them in before the old ones stop working. That is ongoing work that
-follows every OnlyFans release, so it deserves a proper design (rotation
-detection, a canary check, rules versioned by `x-of-rev`) rather than a rushed
-script in a take-home. The design is sketched in `CALL_GUIDE.md`; it was not
-built here. The static script server answers plain HTTP (see the evidence), so
-the rules job does not need a browser to download the client code.
-
-Until then the adapter treats the rejection as a first class outcome
-(`signature_rejected`): it drops the cached rules, the run is dead-lettered,
-**the last valid data is preserved**, and it is replayable once current rules
-are available. It is not a crash and it never writes bad data.
+**Diagnosis that led here (`evidence/direct-route-diagnosis.md`).** The earlier
+community-published rules lagged a web build rotation (`x-of-rev:
+202609171554-...`), so correctly computed signatures were rejected with
+`HTTP 400 {"error":{"code":401,"message":"Please refresh the page"}}`. The API
+path itself is not behind the Cloudflare challenge; only the HTML homepage is.
 
 ### Managed provider, the fallback (`fans:demo live --source=ofapi`)
 
@@ -122,8 +152,8 @@ HTTP 200
 Both adapters map to the same `NormalizedProfile`; the direct one returns the
 profile object unwrapped, the provider wraps it in `data`. Nothing downstream,
 validation, revision safety, queues, isolation, memory, depends on which route
-produced the JSON. That is the point of the interface: once current signing
-rules are supplied, it becomes the working default with no other change.
+produced the JSON. That is the point of the interface: the direct route plugs
+in with no change anywhere else.
 
 **`favoritedCount` versus `favoritesCount`.** The first is ~605,800 and the
 second is 16 for this profile, which is only consistent with the first being

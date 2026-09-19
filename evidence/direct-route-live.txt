@@ -1,0 +1,24 @@
+Direct OnlyFans route, live verification (2026-09-19, this machine)
+====================================================================
+
+$ docker compose exec scheduler php artisan fans:onlyfans-rules --force
+  outcome          activated
+  revision         202609171554-a5a528bc87   (signing chunk 2313.js)
+  verified         proof+canary              (8/8 proof signs matched in PHP; canary HTTP 200)
+
+  Extracted locally: prefix 65335, suffix 6aac0d65, checksum constant 148,
+  32 checksum indexes, app-token 33d57ade...  These match the values seen in
+  a logged-out browser request that returned 200 (direct-route-diagnosis.md).
+
+$ docker compose exec scheduler php artisan fans:demo live --source=onlyfans
+  run status               succeeded
+  outcome                  refresh_accepted
+  upstream requests        1
+  attempt 1                HTTP 200, 261 ms
+  profile id (upstream)    5140520   (madison420ivy)
+  likes (favoritedCount)   606831
+  favoritesCount           16
+
+Headers sent: app-token, sign, time, x-bc (from cdn2.onlyfans.com/key/),
+User-Agent, Accept, Referer. Not sent: cookies, x-hash, x-of-rev, user-id.
+No remote rules feed; downloaded JS ran only in the rulegen container.

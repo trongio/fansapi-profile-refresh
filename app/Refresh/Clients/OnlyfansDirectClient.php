@@ -6,20 +6,13 @@ use App\Models\Profile;
 use App\Refresh\Outcome;
 
 /**
- * Direct, anonymous fetch from onlyfans.com, the way the web client does it for
- * a logged-out visitor: signed headers, user id 0, a client-generated device
- * id, no account and no cookie jar. No browser is involved, so the memory cost
- * is the same as any other HTTP call in this app, and it scales the same way.
+ * Direct anonymous access to the public profile endpoint, signed in PHP the
+ * way the logged-out web client signs. The signing rules are extracted
+ * locally from the current web build (OnlyfansRuleRefresher); no browser,
+ * account, cookies, x-hash, x-of-rev or user-id header is sent.
  *
- * The public profile endpoint returns the profile object itself (not wrapped in
- * "data"); the normalizer handles source "onlyfans" accordingly.
- *
- * Status today: OnlyFans answers a signed anonymous request with HTTP 400 and
- * {"error":{"code":401,"message":"Please refresh the page"}} when the signing
- * rules lag the current web build (the browser also sends x-of-rev and x-hash).
- * See evidence/direct-route-diagnosis.md. That outcome is surfaced as
- * SIGNATURE_REJECTED rather than crashing, and the managed provider adapter is
- * the fallback that returns data today.
+ * A signature rejection keeps the active rules (they are last-known-good),
+ * drops only the cheap x-bc value and asks the scheduler for one refresh.
  */
 class OnlyfansDirectClient extends BoundedHttpClient implements ProfileClient
 {
@@ -33,29 +26,52 @@ class OnlyfansDirectClient extends BoundedHttpClient implements ProfileClient
     public function fetch(Profile $profile): ClientResult
     {
         $rules = $this->rules->current();
-        if (! isset($rules['static_param'])) {
-            return new ClientResult(Outcome::SIGNATURE_REJECTED, null, null, 0, message: 'no signing rules available');
+        if ($rules === null) {
+            $this->rules->requestRefresh('no active signing rules');
+
+            return new ClientResult(Outcome::SIGNATURE_REJECTED, null, null, 0,
+                message: 'no active signing rules yet', signingRevision: 'none');
         }
 
-        $path = '/api2/v2/users/'.rawurlencode($profile->upstream_id ?: $profile->username);
+        $result = $this->request($rules, '/api2/v2/users/'.rawurlencode($profile->upstream_id ?: $profile->username));
 
-        $result = $this->get(
-            rtrim((string) config('fansapi.onlyfans.base_url'), '/').$path,
-            OnlyfansSigner::headers($rules, $path) + [
-                'x-bc' => $this->rules->deviceId(),
-                'User-Agent' => (string) config('fansapi.onlyfans.user_agent'),
-                'Accept' => 'application/json, text/plain, */*',
-                'Referer' => 'https://onlyfans.com/',
-            ],
-        );
+        if ($result->category === Outcome::SIGNATURE_REJECTED) {
+            $this->rules->forgetBrowserCode();
+            $this->rules->requestRefresh("signature rejected for {$rules->revision}");
+        }
 
-        // A stale or bad signature comes back as HTTP 400 carrying a 401 in the
-        // body. Drop the cached rules so the next attempt refetches them.
-        if ($result->status === 400 && str_contains((string) $result->message, 'refresh the page')) {
-            $this->rules->forget();
+        return $result;
+    }
 
-            return new ClientResult(Outcome::SIGNATURE_REJECTED, 400, null, $result->durationMs,
-                message: 'signature rejected; signing rules stale (source '.($rules['_source'] ?? '?').')');
+    /** One signed GET with the given rules. Also used by the activation canary. */
+    public function request(OnlyfansRuleSet $rules, string $path): ClientResult
+    {
+        $browserCode = $this->rules->browserCode();
+        if ($browserCode === null) {
+            return new ClientResult(Outcome::NETWORK_ERROR, null, null, 0, message: 'x-bc endpoint unavailable');
+        }
+
+        $headers = OnlyfansSigner::headers($rules->signatureRules(), $path) + [
+            'x-bc' => $browserCode,
+            'User-Agent' => (string) config('fansapi.onlyfans.user_agent'),
+            'Accept' => 'application/json, text/plain, */*',
+            'Referer' => 'https://onlyfans.com/',
+        ];
+        // The user id (0) is part of the signed string, but a logged-out
+        // browser does not send it as a header.
+        unset($headers['user-id']);
+
+        $result = $this->get(rtrim((string) config('fansapi.onlyfans.base_url'), '/').$path, $headers);
+
+        if ($result->status === 400 && str_contains(strtolower((string) $result->message), 'refresh the page')) {
+            return new ClientResult(
+                Outcome::SIGNATURE_REJECTED,
+                400,
+                null,
+                $result->durationMs,
+                message: "signature rejected for signing revision {$rules->revision}",
+                signingRevision: $rules->revision,
+            );
         }
 
         return $result;

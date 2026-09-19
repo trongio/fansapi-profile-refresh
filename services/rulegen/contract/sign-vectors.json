@@ -1,0 +1,137 @@
+{
+  "comment": "Shared by tests/Unit/OnlyfansSignerTest.php and services/rulegen/test. Both signers must reproduce every sign exactly.",
+  "cases": [
+    {
+      "rules": {
+        "app-token": "ATOKEN",
+        "static_param": "STATIC",
+        "prefix": "PRE",
+        "suffix": "SUF",
+        "checksum_constant": 10,
+        "checksum_indexes": [
+          0,
+          5,
+          10,
+          15,
+          20
+        ]
+      },
+      "vectors": [
+        {
+          "path": "/api2/v2/users/onlyfans",
+          "time": "1700000000000",
+          "user_id": "0",
+          "sign": "PRE:ad26e67bed5e2e11ce94b628ea45617b348a8761:169:SUF"
+        },
+        {
+          "path": "/api2/v2/users/madison420ivy",
+          "time": "1700000000001",
+          "user_id": "0",
+          "sign": "PRE:9b3892e8149eb17f77a215c47b20755ae1ff39b0:145:SUF"
+        },
+        {
+          "path": "/api2/v2/users/12345678",
+          "time": "1712345678901",
+          "user_id": "0",
+          "sign": "PRE:49b20bb737c74f6d6801325178e3b612d1b70b59:19a:SUF"
+        },
+        {
+          "path": "/api2/v2/users/a",
+          "time": "1750000000000",
+          "user_id": "0",
+          "sign": "PRE:0d6c6e35e65a147c92e42baf69af7fa1cacffcb2:169:SUF"
+        },
+        {
+          "path": "/api2/v2/users/some.user_name-x",
+          "time": "1760000123456",
+          "user_id": "0",
+          "sign": "PRE:ea74f6dd850536c553ed550d43f4c10a32fac928:13f:SUF"
+        },
+        {
+          "path": "/api2/v2/users/list?a=1&b=two",
+          "time": "1789840029763",
+          "user_id": "0",
+          "sign": "PRE:7ea27e253bd8bdaaabd293b8a45d16ac820fdf73:1a4:SUF"
+        },
+        {
+          "path": "/api2/v2/users/%C3%A9t%C3%A9",
+          "time": "1799999999999",
+          "user_id": "0",
+          "sign": "PRE:ca4098abf49ffd1f8cf21fedeb66a43c1c7f8107:175:SUF"
+        },
+        {
+          "path": "/api2/v2/init",
+          "time": "1800000000000",
+          "user_id": "0",
+          "sign": "PRE:7dfa41be3386ef72fad6986945d7f5902d82808c:115:SUF"
+        }
+      ]
+    },
+    {
+      "rules": {
+        "app-token": "ATOKEN",
+        "static_param": "1n9nB8zA91Eo8Ku4rnPbwTKf81YB9cOp",
+        "prefix": "65335",
+        "suffix": "6aac0d65",
+        "checksum_constant": -5000,
+        "checksum_indexes": [
+          2,
+          2,
+          3,
+          39,
+          39
+        ]
+      },
+      "vectors": [
+        {
+          "path": "/api2/v2/users/onlyfans",
+          "time": "1700000000000",
+          "user_id": "0",
+          "sign": "65335:75358cadaaad405173176900ae2dca16026e3c9b:1229:6aac0d65"
+        },
+        {
+          "path": "/api2/v2/users/madison420ivy",
+          "time": "1700000000001",
+          "user_id": "0",
+          "sign": "65335:241fb1b5b00b403fe8f1e34cccb2246c0cccb6f5:1256:6aac0d65"
+        },
+        {
+          "path": "/api2/v2/users/12345678",
+          "time": "1712345678901",
+          "user_id": "0",
+          "sign": "65335:1ded02d50957aa31d475d48b7bf7ba72285b64b7:11ec:6aac0d65"
+        },
+        {
+          "path": "/api2/v2/users/a",
+          "time": "1750000000000",
+          "user_id": "0",
+          "sign": "65335:3dd44a7f25dce976f7d20b8a1e3e152ad089857d:11c4:6aac0d65"
+        },
+        {
+          "path": "/api2/v2/users/some.user_name-x",
+          "time": "1760000123456",
+          "user_id": "0",
+          "sign": "65335:a5956fa4c3d6e9bb83891c415bb75bf3e2cc94ea:121f:6aac0d65"
+        },
+        {
+          "path": "/api2/v2/users/list?a=1&b=two",
+          "time": "1789840029763",
+          "user_id": "0",
+          "sign": "65335:5fc2733a11bebd9bd4a5078f37750fdea02dcce6:1224:6aac0d65"
+        },
+        {
+          "path": "/api2/v2/users/%C3%A9t%C3%A9",
+          "time": "1799999999999",
+          "user_id": "0",
+          "sign": "65335:33ecfbbf68202824b5fc988b6bf1e62e7157037b:1197:6aac0d65"
+        },
+        {
+          "path": "/api2/v2/init",
+          "time": "1800000000000",
+          "user_id": "0",
+          "sign": "65335:7e6a88f9b6a5c1a47f906b1b860205d6c9ad9e09:1249:6aac0d65"
+        }
+      ]
+    }
+  ]
+}

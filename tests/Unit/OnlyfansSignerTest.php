@@ -62,4 +62,21 @@ class OnlyfansSignerTest extends TestCase
 
         $this->assertNotSame($one['sign'], $two['sign']);
     }
+
+    /**
+     * Cross-language pin: the same vectors are checked by the Node reference
+     * signer in services/rulegen, so PHP and the extractor cannot drift.
+     */
+    #[Test]
+    public function it_reproduces_the_shared_cross_language_vectors(): void
+    {
+        $contract = json_decode((string) file_get_contents(dirname(__DIR__, 2).'/services/rulegen/contract/sign-vectors.json'), true, 8, JSON_THROW_ON_ERROR);
+
+        foreach ($contract['cases'] as $case) {
+            foreach ($case['vectors'] as $vector) {
+                $headers = OnlyfansSigner::headers($case['rules'], $vector['path'], $vector['user_id'], (int) $vector['time']);
+                $this->assertSame($vector['sign'], $headers['sign'], $vector['path']);
+            }
+        }
+    }
 }

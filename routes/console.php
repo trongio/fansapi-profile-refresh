@@ -14,3 +14,8 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('fans:dispatch-due')->everyMinute()->withoutOverlapping();
 Schedule::command('fans:reconcile')->everyMinute()->withoutOverlapping();
 Schedule::command('horizon:snapshot')->everyFiveMinutes();
+
+// Cheap most minutes: it only acts when a rejection asked for a refresh or the
+// periodic check is due, and only while an OnlyFans-direct account exists.
+// Runs in the background so a slow extraction never delays the two above.
+Schedule::command('fans:onlyfans-rules')->everyMinute()->withoutOverlapping(5)->runInBackground();

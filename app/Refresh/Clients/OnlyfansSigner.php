@@ -9,7 +9,8 @@ namespace App\Refresh\Clients;
  *
  * where checksum is the sum of the sha1 hex characters at checksum_indexes plus
  * checksum_constant, written as lowercase hex of its absolute value. The inputs
- * are the "dynamic rules" OnlyFans rotates (see OnlyfansRules).
+ * are the "dynamic rules" OnlyFans rotates; they are extracted locally from
+ * the current web build (see OnlyfansRuleRefresher).
  *
  * Pure function, no I/O, so it is unit-testable against a fixed vector.
  */

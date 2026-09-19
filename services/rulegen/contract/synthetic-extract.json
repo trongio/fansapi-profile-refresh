@@ -1,0 +1,66 @@
+{
+  "ok": true,
+  "sentry_release": "202609010000-0123456789",
+  "static_param": "SyntheticStaticParam0123456789ab",
+  "prefix": "12345",
+  "suffix": "abcd1234",
+  "checksum_indexes": [
+    1,
+    1,
+    5,
+    9,
+    22,
+    39
+  ],
+  "checksum_constant": -77,
+  "proof": [
+    {
+      "path": "/api2/v2/users/onlyfans",
+      "time": "1700000000000",
+      "user_id": "0",
+      "sign": "12345:d82e8eccda21b748d5689c9c3482d9f99375cf4f:188:abcd1234"
+    },
+    {
+      "path": "/api2/v2/users/madison420ivy",
+      "time": "1700000000001",
+      "user_id": "0",
+      "sign": "12345:db3ac2c198f73c3bdac28286d38732db22721fdd:17d:abcd1234"
+    },
+    {
+      "path": "/api2/v2/users/12345678",
+      "time": "1712345678901",
+      "user_id": "0",
+      "sign": "12345:cf0f0b3e52f426240a8e678f1622fd5d4f866d46:181:abcd1234"
+    },
+    {
+      "path": "/api2/v2/users/a",
+      "time": "1750000000000",
+      "user_id": "0",
+      "sign": "12345:4cd9fc2df843edf2a1a9cba9f6b92516c02e6db3:1a8:abcd1234"
+    },
+    {
+      "path": "/api2/v2/users/some.user_name-x",
+      "time": "1760000123456",
+      "user_id": "0",
+      "sign": "12345:e537d6c4a6878a5ea39d8d9a12b5bef35de69c28:fa:abcd1234"
+    },
+    {
+      "path": "/api2/v2/users/list?a=1&b=two",
+      "time": "1789840029763",
+      "user_id": "0",
+      "sign": "12345:8b9eab135096a8e1c572684b0a17e8d036ee9fb1:16e:abcd1234"
+    },
+    {
+      "path": "/api2/v2/users/%C3%A9t%C3%A9",
+      "time": "1799999999999",
+      "user_id": "0",
+      "sign": "12345:d96e790d7967990f068515dc1b19642b0d37f7c2:12d:abcd1234"
+    },
+    {
+      "path": "/api2/v2/init",
+      "time": "1800000000000",
+      "user_id": "0",
+      "sign": "12345:b7f22766eeef64e6830fafd1a2a8040d20bbbad3:154:abcd1234"
+    }
+  ]
+}

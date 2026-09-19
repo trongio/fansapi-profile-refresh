@@ -51,9 +51,11 @@ Jobs are tagged `run:<id>`, so a single refresh can be found under *Monitoring*.
 > currently gets a 400 asking to refresh the page. I diffed it against a
 > logged-out browser request that works: it is not a browser wall, the signing
 > rules rotated with a new web build and the public copy had not caught up. So
-> the direct adapter reports that cleanly and preserves the last good data, and
-> the managed provider is the fallback that returns data. Everything else is measured locally against a
-> fixture upstream in its own container.
+> I dropped the public copy: an isolated internal service now extracts the
+> rules from the current build itself, PHP proves and canaries them before
+> activating, and a rotation keeps the last good rules instead of breaking.
+> Everything else is measured locally against a fixture upstream in its own
+> container.
 
 ## Five-minute demo
 
@@ -144,6 +146,9 @@ The request path is: **UI, CLI or scheduler → `RefreshDispatcher` → Redis �
 | `config/fansapi.php` | Every timeout, budget and interval the README quotes. |
 | `tests/Feature/DataProtectionTest.php` | Uniqueness, revision ordering, replay after commit, and the 100000 boundary. |
 | `tests/Feature/ConcurrentCommitTest.php` | The same ordering rule under real two-process contention. |
+| `services/rulegen/` | Isolated Node service: discovers the current signing chunk and extracts the rules in a sandboxed child process. |
+| `app/Refresh/Clients/OnlyfansRuleRefresher.php` | Extract, prove, canary, activate under one lock; failures keep the last-known-good rules. |
+| `tests/Feature/OnlyfansRulesTest.php` | Proof, canary, last-known-good, single flight, scheduling and the one-retry rule. |
 
 ## The direct route: last mile without the fallback
 
@@ -163,44 +168,48 @@ and `x-hash`, which we do not.
 I tested it properly it was wrong. The real dependency is the rule rotation."
 Saying this first is better than being caught on it.
 
-**What finishing it actually means.**
-1. Detect a new build: `x-of-rev` changes, or `signature_rejected` climbs
-   above a threshold. The adapter already drops cached rules on rejection.
-2. Get current rules: derive them from the current client bundle ourselves,
-   rather than waiting on a community repo that lags by days. The bundle lives
-   under `static2.onlyfans.com/static/prod/f/<x-of-rev>/` and downloads with
-   plain HTTP, no cookies. Extract by running the signing function in a
-   sandbox rather than pattern matching, so obfuscation changes matter less.
-3. Produce `x-hash` and a consistent `fp`/`x-bc` pair the way the page does.
-   Not worked out yet; say so.
-4. Verify before publishing: sign one request for a known public profile and
-   accept the rules only on a 200. Store them in Redis keyed by `x-of-rev`;
-   workers pick them up with no deploy.
-5. Canary: that same check every few minutes, so a rotation is noticed before
-   real jobs fail.
+**What was built after that.**
+1. Get current rules ourselves, not from a community repo that lags by days.
+   `services/rulegen` fetches the homepage (curl-impersonate, no challenge
+   solving), rebuilds the signing chunk URL under
+   `static2.onlyfans.com/static/prod/<hex>/<x-of-rev>/`, and runs the chunk in
+   a killable, permission-restricted child process with its SHA-1 stubbed, so
+   the constants are recovered by execution, not pattern matching.
+2. Verify before publishing: the real extracted function signs 8 fixed inputs;
+   PHP must reproduce every sign exactly, then one canary request for a public
+   profile must return 200. Only then are the rules activated in Redis,
+   versioned by `x-of-rev`; workers pick them up with no deploy.
+3. Detect rotation: a scheduled check every 30 minutes, plus an immediate
+   request from any `signature_rejected`, rate limited to one per window.
+4. `x-bc` comes from `cdn2.onlyfans.com/key/`; `x-hash` is not enforced on the
+   profile endpoint, so it is not sent.
 
 Nothing downstream changes: the normalizer already accepts the unwrapped
 direct shape, and writes, revisions and memory do not care which adapter ran.
 
 **Without the fallback.**
-There is nothing to switch to, so a rotation must not lose data:
-retry once with freshly fetched rules; hold `signature_rejected` runs in the
-dead-letter queue; keep serving the last good snapshot, marked with when it was
-last refreshed; replay the held runs once the new rules pass the check. The
-number to watch is time from rotation to recovery, plus rejections per rules
-version. All of the hold, preserve and replay machinery already exists.
+There is nothing to switch to, so a rotation must not lose data. The active
+rules are last-known-good and survive any failed discovery, extraction, proof
+or canary. A rejected run is retried once, and only if a newer verified
+revision was activated meanwhile; otherwise it is dead-lettered, the last good
+snapshot is kept, and it is replayable. If Cloudflare blocks the homepage, the
+failure is explicit (`DISCOVERY_CHALLENGED`) and the old rules keep serving
+until they are actually rejected. The number to watch is time from rotation to
+recovery.
 
 **Where a browser is and is not acceptable.**
-Never in the workers: that is where memory matters. At most once per release in
-the rules job, and only if discovering the current build and file names turns
-out to need a page load, since the homepage is behind Cloudflare.
+Never in the workers: that is where memory matters. The rules service uses
+curl-impersonate, not a browser; a headless browser would only be worth adding
+there, once per release, if the homepage starts challenging curl-impersonate
+and a browser passes. Downloaded code never runs in PHP.
 
 **Question to ask them.**
 "How quickly do you usually need to react when OnlyFans ships a new build, and
 what breaks most often for you: the rules, `x-hash`, or sessions?"
 
-**Don'ts.** No live demo of the direct route (it returns 400 today). Don't
-claim it "almost works". Don't frame the provider as the answer; they are the
+**Don'ts.** The live route returned 200 on 2026-09-19
+(`evidence/direct-route-live.txt`); rerun `fans:onlyfans-rules --force` before
+claiming it works on the day. Don't frame the provider as the answer; they are the
 provider, and this work is their product.
 
 ## Likely questions
