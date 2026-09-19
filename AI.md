@@ -93,7 +93,7 @@ These were real defects found by running the thing, not hypotheticals:
 ## Review pass after the first submission
 
 A second pass checked the code against ordinary Laravel conventions and made
-these changes, all covered by the test suite (now 62 tests):
+these changes, all covered by the test suite (62 tests at the time; 96 after the direct-route work):
 
 - run status is a backed enum (`App\Enums\RunStatus`) cast on the model,
   instead of string constants;

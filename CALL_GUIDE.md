@@ -301,8 +301,10 @@ problems show a growing oldest-waiting age with a normal outcome mix.
 - The crash test covers redelivery after a database commit. It does not cover
   OS-level kills, reservation expiry, or partial writes.
 - Two workers on one machine. Nothing here demonstrates production scale.
-- The direct adapter returns 400 until its signing rules match the current web
-  build. The diagnosis is in `evidence/direct-route-diagnosis.md`; the rules
-  pipeline that would track rotations is designed above, not built.
+- The direct route returned 200 live on 2026-09-19
+  (`evidence/direct-route-live.txt`). Its delegated signer, for a build that
+  changes the formula itself, is proven only by tests on synthetic chunks; no
+  live build has needed it yet. Run `fans:onlyfans-rules --canary` before the
+  call rather than assuming the signer is still current.
 - If anything live fails during the call, use `evidence/`; every number quoted
   above is in there with its command and exit status.

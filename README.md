@@ -495,15 +495,15 @@ before this session, which was not timed.
 | Live probe, scaffold, Docker image, Compose | 15 min | `curl` of the provider first, Laravel 13 skeleton, PHP 8.4 image, dependency resolution |
 | Core pipeline | 30 min | migrations, models, client, normalizer, writer, dispatcher, job, fixture server, demo commands |
 | Bring-up and first runs | 15 min | stack up, broken and fixed reproductions, both workload modes, two real defects fixed |
-| Tests | 20 min | 62 tests across eight files, including the two-process race |
+| Tests | 20 min | 62 tests across eight files (at submission; 96 now), including the two-process race |
 | Dead letters, memory scenario, live run, evidence | 20 min | DLQ replay path, memory probe, `fans:demo live`, `capture-evidence.sh` |
 | Documentation and clean-setup check | 15 min | README, call guide, AI.md, requirements map, teardown and rebuild from empty volumes |
 | Review pass | 30 min | enum, factories, listeners, scheduled commands, Pint, Playwright run, direct-route probe, evidence regenerated |
 | **Total** | **about 2 h 25 min** | first command to last push |
 
 Not done, deliberately: no REST API, no SPA, no media downloads, no external
-search service, no production infrastructure, no automated tracking of the
-OnlyFans signing-rule rotation (the direct adapter exists, see above). Not
+search service, no production infrastructure. Rotation tracking for the
+direct route was added after the original submission (see above). Not
 proven: the provider's own failure modes under real load, crash semantics
 beyond the commit boundary, and anything about scale beyond this one machine.
 `AI.md` lists what remains unverified.
