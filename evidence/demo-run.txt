@@ -1,0 +1,222 @@
+Demo sequence from CALL_GUIDE / the call cheat sheet, run end to end
+2026-09-19, 18:43 to 18:48 UTC, this machine, commit 79c4578
+dc  = docker compose exec app      dcs = docker compose exec scheduler
+Every step behaved as described; step 2 exits 1 on purpose.
+
+========================================================================
+1. Good starting state
+========================================================================
+$ dc php artisan fans:demo seed
+exit: 0
+----------------------------------------------------------------
+Seeded 22 profiles across 4 accounts at likes=120000 revision=9.
+
+$ dc php artisan fans:demo state
+exit: 0
+----------------------------------------------------------------
+Mode: FIXTURE   (accounts carry their own source)
++----------+-------------------+--------+----------+--------------------+--------------+---------+---------------------+
+| account  | profile           | likes  | revision | last success (UTC) | last failure | pending | next refresh        |
++----------+-------------------+--------+----------+--------------------+--------------+---------+---------------------+
+| A        | a-01              | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| A        | a-02              | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| A        | a-03              | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| A        | a-04              | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| A        | a-05              | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| A        | a-06              | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| A        | a-07              | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| A        | a-08              | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| A        | a-09              | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| A        | a-10              | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| A        | a-11              | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| A        | a-12              | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| B        | b-01              | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| B        | b-02              | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| B        | b-03              | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| B        | b-04              | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| A        | case-old-format   | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| A        | case-new-format   | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| A        | case-throttled    | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| A        | case-server-error | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| LIVE     | madison420ivy     | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
+| PROVIDER | madison420ivy     | 120000 | 9        | -                  | -            | no      | 2026-09-20 18:43:14 |
++----------+-------------------+--------+----------+--------------------+--------------+---------+---------------------+
++----------+-------+---------+----------+-----------------+---------+------+-----------------+--------+
+| account  | ready | delayed | reserved | valid refreshes | retries | dead | oldest wait (s) | latest |
++----------+-------+---------+----------+-----------------+---------+------+-----------------+--------+
+| A        | 0     | 0       | 0        | 0               | 0       | 0    | -               | -      |
+| B        | 0     | 0       | 0        | 0               | 0       | 0    | -               | -      |
+| LIVE     | 0     | 0       | 0        | 0               | 0       | 0    | -               | -      |
+| PROVIDER | 0     | 0       | 0        | 0               | 0       | 0    | -               | -      |
++----------+-------+---------+----------+-----------------+---------+------+-----------------+--------+
+
+========================================================================
+2. The bug (exit 1 is the expected result)
+========================================================================
+$ dc php artisan fans:demo broken
+exit: 1
+----------------------------------------------------------------
+
+Mode: broken  (expectation: a response we cannot validate must preserve the last valid snapshot)
++-------------------+--------------+-----------------+---------------------+--------------+--------------------+-------------+
+| case              | stored likes | stored revision | last success        | last failure | expected likes/rev | verdict     |
++-------------------+--------------+-----------------+---------------------+--------------+--------------------+-------------+
+| case-new-format   | 0            | 9               | 2026-09-19 18:43:16 | -            | 121000 / 11        | ZEROED      |
+| case-old-format   | 120000       | 9               | 2026-09-19 18:43:16 | -            | 120000 / 10        | NOT APPLIED |
+| case-server-error | 0            | 9               | 2026-09-19 18:43:16 | -            | 120000 / 9         | ZEROED      |
+| case-throttled    | 0            | 9               | 2026-09-19 18:43:16 | -            | 120000 / 9         | ZEROED      |
++-------------------+--------------+-----------------+---------------------+--------------+--------------------+-------------+
+4 of 4 cases did not end with the expected accepted data (3 were overwritten with zero), and all 4 were recorded as successful refreshes.
+This is the reproduction. Exit status 1 is the expected result here.
+
+========================================================================
+3. The fix, same four inputs
+========================================================================
+$ dc php artisan fans:demo seed && dc php artisan fans:demo fixed
+exit: 0   elapsed: 90 s
+----------------------------------------------------------------
+
+Mode: fixed  (expectation: a response we cannot validate must preserve the last valid snapshot)
++-------------------+--------------+-----------------+---------------------+------------------+--------------------+---------+
+| case              | stored likes | stored revision | last success        | last failure     | expected likes/rev | verdict |
++-------------------+--------------+-----------------+---------------------+------------------+--------------------+---------+
+| case-new-format   | 121000       | 11              | 2026-09-19 18:43:25 | -                | 121000 / 11        | OK      |
+| case-old-format   | 120000       | 10              | 2026-09-19 18:43:25 | -                | 120000 / 10        | OK      |
+| case-server-error | 120000       | 9               | -                   | budget_exhausted | 120000 / 9         | OK      |
+| case-throttled    | 120000       | 9               | -                   | budget_exhausted | 120000 / 9         | OK      |
++-------------------+--------------+-----------------+---------------------+------------------+--------------------+---------+
+All four cases preserved or advanced data correctly.
+
+========================================================================
+4. Two-account workload
+========================================================================
+$ dc php artisan fans:demo workload --mode=fixed
+exit: 0   elapsed: 53 s
+----------------------------------------------------------------
+  mode=fixed: resetting demo data
+  fixture scenario pushed; scenario clock started
+  account A burst queued at t=0 (12 profiles)
+  account B profile b-01 queued at t=1.2s
+  account B profile b-02 queued at t=4.2s
+  account B profile b-03 queued at t=7.3s
+  account B profile b-04 queued at t=10.3s
+  workload finished after 51.4s
+
++---------+------+-----------------+-----------------+---------------+--------------------+---------+------+----------------------+-----------------------+
+| account | runs | valid refreshes | false successes | upstream reqs | reqs/valid refresh | retries | dead | peak oldest wait (s) | final oldest wait (s) |
++---------+------+-----------------+-----------------+---------------+--------------------+---------+------+----------------------+-----------------------+
+| A       | 12   | 12              | 0               | 15            | 1.25               | 27      | 0    | 50                   | -                     |
+| B       | 4    | 4               | 0               | 4             | 1                  | 0       | 0    | 2                    | -                     |
++---------+------+-----------------+-----------------+---------------+--------------------+---------+------+----------------------+-----------------------+
+
+========================================================================
+5. Late response and crash replay
+========================================================================
+$ dc ./vendor/bin/phpunit --filter 'late_older_revision|replaying_a_committed_run|concurrent_older_revision' --testdox
+exit: 0
+----------------------------------------------------------------
+PHPUnit 12.5.35 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.25
+Configuration: /var/www/html/phpunit.xml
+
+...                                                                 3 / 3 (100%)
+
+Time: 00:05.327, Memory: 18.00 MB
+
+Concurrent Commit (Tests\Feature\ConcurrentCommit)
+ ✔ A concurrent older revision cannot overwrite a newer committed one
+
+Data Protection (Tests\Feature\DataProtection)
+ ✔ A late older revision cannot overwrite a newer one
+ ✔ Replaying a committed run changes nothing
+
+OK (3 tests, 14 assertions)
+
+========================================================================
+6. Dead letter and replay
+========================================================================
+$ dc php artisan fans:demo dlq-demo
+exit: 0   elapsed: 52 s
+----------------------------------------------------------------
+1. upstream is permanently throttled for a-01
++-------------------+---------------------------------------------------------------------------------+
+| field             | value                                                                           |
++-------------------+---------------------------------------------------------------------------------+
+| run               | 1                                                                               |
+| status            | dead_lettered                                                                   |
+| reason            | upstream request budget exhausted after 5 attempts; last category was throttled |
+| upstream requests | 5                                                                               |
+| queue deliveries  | 10                                                                              |
+| failed_jobs uuid  | c9aabf57-508f-4bf8-889f-940ca92ad674                                            |
+| preserved likes   | 120000                                                                          |
+| last success      | never                                                                           |
++-------------------+---------------------------------------------------------------------------------+
+2. fixture repaired: a-01 now serves the new nested format at revision 11
+3. replaying through the ordinary dispatch path
+   concurrent replay request returned: a replay is already pending
++--------------------------+------------------------------------------+
+| field                    | value                                    |
++--------------------------+------------------------------------------+
+| replay run               | 2                                        |
+| replay status            | succeeded                                |
+| stored likes             | 121000                                   |
+| stored revision          | 11                                       |
+| last success             | 2026-09-19 18:47:04                      |
+| original run status      | dead_lettered (kept for the audit trail) |
+| original resolved at     | 2026-09-19 18:47:04                      |
+| duplicate active replays | 1                                        |
++--------------------------+------------------------------------------+
+Dead letter replayed and resolved; data is valid.
+
+========================================================================
+7. Direct OnlyFans route, live
+========================================================================
+$ dcs php artisan fans:onlyfans-rules --status
+exit: 0
+----------------------------------------------------------------
++----------------------------------------------------------------+-------------------------------------+
+| signer                                                         | value                               |
++----------------------------------------------------------------+-------------------------------------+
+| active build                                                   | 202609171554-a5a528bc87             |
+| mode                                                           | constants                           |
+| verified                                                       | proof+canary                        |
+| activated at                                                   | 2026-09-19T18:05:43+00:00           |
+| replaced build                                                 | -                                   |
+| recovery time (first rejection of the old build to activation) | -                                   |
+| rejections on active build                                     | 0                                   |
+| previous build                                                 | -                                   |
+| rejections on previous build                                   | -                                   |
+| builds kept                                                    | 202609171554-a5a528bc87             |
+| last refresh attempt                                           | 2026-09-19T18:44:01+00:00 unchanged |
+| last canary                                                    | 2026-09-19T18:42:47+00:00 ok        |
+| refresh requested                                              | no                                  |
++----------------------------------------------------------------+-------------------------------------+
+
+$ dcs php artisan fans:onlyfans-rules --canary
+exit: 0
+----------------------------------------------------------------
+canary madison420ivy on 202609171554-a5a528bc87: ok (ok 200)
+
+$ dcs php artisan fans:demo live --source=onlyfans
+exit: 0
+----------------------------------------------------------------
+Live source: onlyfans
+Queued live run 3 for madison420ivy (real background worker).
++-------------------------------------+-------------------------------------+
+| field                               | value                               |
++-------------------------------------+-------------------------------------+
+| run status                          | succeeded                           |
+| outcome                             | refresh_accepted                    |
+| upstream requests                   | 1                                   |
+| profile id (upstream)               | 5140520                             |
+| likes (favoritedCount)              | 606835                              |
+| favoritesCount (outgoing, retained) | 16                                  |
+| subscriber count                    | not exposed by this endpoint (null) |
+| upstream revision                   | not exposed by this endpoint (null) |
+| served from provider cache          | n/a (direct)                        |
+| failure (if any)                    | data updated                        |
+| last success (UTC)                  | 2026-09-19 18:47:08                 |
+| next refresh (UTC)                  | 2026-09-20 18:47:08                 |
++-------------------------------------+-------------------------------------+
+
